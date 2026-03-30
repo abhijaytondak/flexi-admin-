@@ -3,7 +3,7 @@ import * as api from "../utils/api";
 import { useSearch } from "../contexts/SearchContext";
 import { useUserProfile } from "../contexts/UserProfileContext";
 import { PLAN_META, BENEFIT_PLANS, AVATAR_COLORS, type BenefitPlan } from "../types";
-import { getTimeGreeting, getInitials } from "../utils/helpers";
+import { getTimeGreeting, formatINR } from "../utils/helpers";
 import {
   TrendingUp,
   TrendingDown,
@@ -20,6 +20,12 @@ import {
   Pencil,
   Upload,
   Calendar,
+  Filter,
+  LayoutGrid,
+  MoreHorizontal,
+  ArrowUpRight,
+  ArrowDownRight,
+  FileText,
 } from "lucide-react";
 import {
   PieChart,
@@ -27,49 +33,145 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  Legend,
 } from "recharts";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   CSS-in-JS helpers — all inline styles use design-system CSS variables
+   Design tokens — Microdose-inspired analytics dashboard
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const CSS = {
-  /* Reusable transition for interactive cards */
-  cardTransition: "box-shadow 200ms ease, transform 200ms ease, border-color 200ms ease",
-  /* Consistent font stack fallback */
-  font: "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+const T = {
+  font: "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  bg: "#FAFAFA",
+  card: "#FFFFFF",
+  border: "#EBEBEB",
+  fg: "#1A1A1A",
+  muted: "#8C8C8C",
+  mutedLight: "#B3B3B3",
+  accent: "#E8683A",
+  green: "#27AE60",
+  greenBg: "#EAFAF1",
+  red: "#E74C3C",
+  redBg: "#FDEDEC",
+  amber: "#F39C12",
+  amberBg: "#FEF9E7",
+  blue: "#3498DB",
+  blueBg: "#EBF5FB",
+  purple: "#9B59B6",
+  radius: 12,
+  transition: "all 200ms ease",
 } as const;
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Static chart data
+   Static chart data — Benefit Utilization
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const DONUT_DATA = [
-  { name: "HRA", value: 32, color: "#3498DB" },
-  { name: "Fuel & Travel", value: 22, color: "#27AE60" },
-  { name: "Meal Allowance", value: 18, color: "#F39C12" },
-  { name: "Children Education", value: 12, color: "#9B59B6" },
-  { name: "NPS", value: 10, color: "#E67E22" },
-  { name: "Phone & Internet", value: 6, color: "#E74C3C" },
+const UTILIZATION_DATA = [
+  { month: "Apr", food: 32, fuel: 24, communication: 18 },
+  { month: "May", food: 35, fuel: 28, communication: 22 },
+  { month: "Jun", food: 38, fuel: 26, communication: 25 },
+  { month: "Jul", food: 42, fuel: 30, communication: 20 },
+  { month: "Aug", food: 40, fuel: 34, communication: 28 },
+  { month: "Sep", food: 45, fuel: 32, communication: 26 },
+  { month: "Oct", food: 48, fuel: 36, communication: 30 },
+  { month: "Nov", food: 50, fuel: 38, communication: 32 },
+  { month: "Dec", food: 46, fuel: 40, communication: 35 },
+  { month: "Jan", food: 52, fuel: 42, communication: 34 },
+  { month: "Feb", food: 55, fuel: 44, communication: 38 },
+  { month: "Mar", food: 58, fuel: 46, communication: 40 },
 ];
 
-const BAR_DATA = [
-  { month: "Apr", planned: 42, realized: 38 },
-  { month: "May", planned: 45, realized: 40 },
-  { month: "Jun", planned: 48, realized: 44 },
-  { month: "Jul", planned: 50, realized: 47 },
-  { month: "Aug", planned: 52, realized: 45 },
-  { month: "Sep", planned: 55, realized: 50 },
-  { month: "Oct", planned: 58, realized: 52 },
-  { month: "Nov", planned: 60, realized: 56 },
-  { month: "Dec", planned: 62, realized: 58 },
-  { month: "Jan", planned: 65, realized: 60 },
-  { month: "Feb", planned: 68, realized: 63 },
-  { month: "Mar", planned: 72, realized: 67 },
+/* Claims Overview — daily volume over past month */
+const CLAIMS_OVERVIEW_DATA = [
+  { date: "1", claims: 820 },
+  { date: "3", claims: 1200 },
+  { date: "5", claims: 950 },
+  { date: "7", claims: 1800 },
+  { date: "9", claims: 2100 },
+  { date: "11", claims: 1600 },
+  { date: "13", claims: 3200 },
+  { date: "15", claims: 4500 },
+  { date: "17", claims: 3800 },
+  { date: "19", claims: 5200 },
+  { date: "21", claims: 6800 },
+  { date: "23", claims: 7200 },
+  { date: "25", claims: 9400 },
+  { date: "27", claims: 11200 },
+  { date: "29", claims: 12800 },
+  { date: "31", claims: 14200 },
+];
+
+/* Plan Distribution by department — horizontal stacked bar */
+const PLAN_DISTRIBUTION_DATA = [
+  { dept: "Engineering", standard: 45, premium: 62, executive: 28 },
+  { dept: "Sales", standard: 38, premium: 44, executive: 15 },
+  { dept: "Marketing", standard: 22, premium: 30, executive: 12 },
+  { dept: "Operations", standard: 30, premium: 25, executive: 8 },
+  { dept: "Finance", standard: 18, premium: 20, executive: 10 },
+  { dept: "HR", standard: 12, premium: 14, executive: 6 },
+];
+
+/* Benefit Trend — actual vs target */
+const BENEFIT_TREND_DATA = [
+  { month: "Apr", actual: 12.5, target: 14 },
+  { month: "May", actual: 13.2, target: 14.5 },
+  { month: "Jun", actual: 14.8, target: 15 },
+  { month: "Jul", actual: 15.2, target: 15.5 },
+  { month: "Aug", actual: 14.6, target: 16 },
+  { month: "Sep", actual: 16.1, target: 16.5 },
+  { month: "Oct", actual: 17.4, target: 17 },
+  { month: "Nov", actual: 18.2, target: 17.5 },
+  { month: "Dec", actual: 17.8, target: 18 },
+  { month: "Jan", actual: 19.5, target: 18.5 },
+  { month: "Feb", actual: 20.1, target: 19 },
+  { month: "Mar", actual: 21.8, target: 19.5 },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   AvatarEditorPopover
+   Shared style helpers
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const cardStyle: React.CSSProperties = {
+  background: T.card,
+  border: `1px solid ${T.border}`,
+  borderRadius: T.radius,
+  padding: 24,
+  fontFamily: T.font,
+};
+
+const cardHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: 20,
+};
+
+const cardTitleStyle: React.CSSProperties = {
+  fontSize: 15,
+  fontWeight: 600,
+  color: T.fg,
+  margin: 0,
+  lineHeight: 1.3,
+};
+
+const cardSubtitleStyle: React.CSSProperties = {
+  fontSize: 13,
+  color: T.muted,
+  margin: "2px 0 0",
+  fontWeight: 400,
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AvatarEditorPopover — simplified
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function AvatarEditorPopover({
@@ -105,28 +207,28 @@ function AvatarEditorPopover({
         top: "calc(100% + 8px)",
         left: 0,
         zIndex: 50,
-        background: "var(--color-background)",
-        borderRadius: "var(--rounded-lg)",
-        boxShadow: "var(--elevation-lg)",
-        border: "1px solid var(--color-border)",
-        padding: "var(--space-5)",
+        background: T.card,
+        borderRadius: T.radius,
+        boxShadow: "0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)",
+        border: `1px solid ${T.border}`,
+        padding: 20,
         width: 260,
-        fontFamily: CSS.font,
+        fontFamily: T.font,
       }}
     >
       {/* Preview */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <div
           style={{
             width: 44,
             height: 44,
-            borderRadius: "var(--rounded-full)",
+            borderRadius: "50%",
             background: localColor,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             color: "#fff",
-            fontSize: "var(--text-sm)",
+            fontSize: 13,
             fontWeight: 700,
             letterSpacing: "0.5px",
             flexShrink: 0,
@@ -135,15 +237,7 @@ function AvatarEditorPopover({
           {localInitials}
         </div>
         <div style={{ flex: 1 }}>
-          <label
-            style={{
-              display: "block",
-              fontSize: "var(--text-xs)",
-              color: "var(--color-muted-foreground)",
-              marginBottom: 4,
-              fontWeight: 500,
-            }}
-          >
+          <label style={{ display: "block", fontSize: 11, color: T.muted, marginBottom: 4, fontWeight: 500 }}>
             Initials
           </label>
           <input
@@ -153,42 +247,28 @@ function AvatarEditorPopover({
             style={{
               width: "100%",
               padding: "6px 10px",
-              borderRadius: "var(--rounded-md)",
-              border: "1px solid var(--color-border)",
-              fontSize: "var(--text-sm)",
-              fontFamily: CSS.font,
+              borderRadius: 8,
+              border: `1px solid ${T.border}`,
+              fontSize: 13,
+              fontFamily: T.font,
               fontWeight: 600,
               letterSpacing: "1px",
               outline: "none",
               textAlign: "center",
               transition: "border-color 150ms",
+              boxSizing: "border-box",
             }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--brand-blue)")}
-            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--color-border)")}
+            onFocus={(e) => (e.currentTarget.style.borderColor = T.accent)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = T.border)}
           />
         </div>
       </div>
 
       {/* Color grid */}
-      <label
-        style={{
-          display: "block",
-          fontSize: "var(--text-xs)",
-          color: "var(--color-muted-foreground)",
-          marginBottom: 8,
-          fontWeight: 500,
-        }}
-      >
+      <label style={{ display: "block", fontSize: 11, color: T.muted, marginBottom: 8, fontWeight: 500 }}>
         Color
       </label>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(6, 1fr)",
-          gap: 6,
-          marginBottom: "var(--space-4)",
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6, marginBottom: 16 }}>
         {AVATAR_COLORS.map((c) => (
           <button
             key={c}
@@ -196,11 +276,11 @@ function AvatarEditorPopover({
             style={{
               width: 32,
               height: 32,
-              borderRadius: "var(--rounded-full)",
+              borderRadius: "50%",
               background: c,
-              border: localColor === c ? "3px solid var(--color-foreground)" : "3px solid transparent",
+              border: localColor === c ? `3px solid ${T.fg}` : "3px solid transparent",
               cursor: "pointer",
-              transition: "transform 150ms, border-color 150ms",
+              transition: "transform 150ms",
               outline: "none",
               padding: 0,
             }}
@@ -211,24 +291,24 @@ function AvatarEditorPopover({
       </div>
 
       {/* Actions */}
-      <div style={{ display: "flex", gap: "var(--space-2)" }}>
+      <div style={{ display: "flex", gap: 8 }}>
         <button
           onClick={() => onSave(localInitials, localColor)}
           style={{
             flex: 1,
             padding: "8px 0",
-            background: "var(--brand-navy)",
+            background: T.accent,
             color: "#fff",
             border: "none",
-            borderRadius: "var(--rounded-md)",
-            fontSize: "var(--text-xs)",
+            borderRadius: 8,
+            fontSize: 12,
             fontWeight: 600,
-            fontFamily: CSS.font,
+            fontFamily: T.font,
             cursor: "pointer",
-            transition: "background 150ms",
+            transition: "opacity 150ms",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--brand-navy-hover)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "var(--brand-navy)")}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
         >
           Save
         </button>
@@ -238,23 +318,17 @@ function AvatarEditorPopover({
             flex: 1,
             padding: "8px 0",
             background: "transparent",
-            color: "var(--color-muted-foreground)",
-            border: "1px solid var(--color-border)",
-            borderRadius: "var(--rounded-md)",
-            fontSize: "var(--text-xs)",
+            color: T.muted,
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            fontSize: 12,
             fontWeight: 500,
-            fontFamily: CSS.font,
+            fontFamily: T.font,
             cursor: "pointer",
-            transition: "background 150ms, border-color 150ms",
+            transition: "background 150ms",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--color-card)";
-            e.currentTarget.style.borderColor = "var(--color-muted-foreground)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.borderColor = "var(--color-border)";
-          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
           Cancel
         </button>
@@ -264,215 +338,118 @@ function AvatarEditorPopover({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PlannedRealizedChart — CSS-only interactive bar chart
+   Custom Recharts Tooltip
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function PlannedRealizedChart() {
-  const [activeMonth, setActiveMonth] = useState<string | null>(null);
-  const maxVal = Math.max(...BAR_DATA.flatMap((d) => [d.planned, d.realized]));
-  const chartHeight = 220;
-
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
   return (
-    <div style={{ position: "relative" }}>
-      {/* Legend */}
-      <div style={{ display: "flex", gap: "var(--space-5)", marginBottom: "var(--space-4)" }}>
-        {[
-          { label: "Planned", color: "var(--brand-blue)" },
-          { label: "Realized", color: "var(--brand-green)" },
-        ].map((item) => (
-          <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: 2,
-                background: item.color,
-              }}
-            />
-            <span style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
-              {item.label}
-            </span>
-          </div>
-        ))}
-      </div>
+    <div
+      style={{
+        background: T.fg,
+        color: "#fff",
+        padding: "10px 14px",
+        borderRadius: 8,
+        fontSize: 12,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+        lineHeight: 1.6,
+        fontFamily: T.font,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 11, opacity: 0.7 }}>{label}</div>
+      {payload.map((p: any, i: number) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color, flexShrink: 0 }} />
+          <span style={{ opacity: 0.8 }}>{p.name}:</span>
+          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{p.value}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-      {/* Bars */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          gap: 6,
-          height: chartHeight,
-          paddingBottom: 28,
-          position: "relative",
-        }}
-      >
-        {/* Horizontal grid lines */}
-        {[0, 0.25, 0.5, 0.75, 1].map((frac) => (
-          <div
-            key={frac}
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 28 + (chartHeight - 28) * frac,
-              borderBottom:
-                frac === 0 ? "1px solid var(--color-border)" : "1px dashed rgba(0,0,0,0.06)",
-              pointerEvents: "none",
-            }}
-          />
-        ))}
+function SingleLineTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div
+      style={{
+        background: T.fg,
+        color: "#fff",
+        padding: "8px 12px",
+        borderRadius: 8,
+        fontSize: 12,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+        fontFamily: T.font,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 2, fontSize: 11, opacity: 0.7 }}>Day {label}</div>
+      {payload.map((p: any, i: number) => (
+        <div key={i}>
+          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+            {typeof p.value === "number" ? p.value.toLocaleString("en-IN") : p.value}
+          </span>
+          <span style={{ opacity: 0.7, marginLeft: 4 }}>{p.name}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-        {BAR_DATA.map((d) => {
-          const isActive = activeMonth === d.month;
-          const isDimmed = activeMonth !== null && !isActive;
-          const plannedH = (d.planned / maxVal) * (chartHeight - 28);
-          const realizedH = (d.realized / maxVal) * (chartHeight - 28);
-
-          return (
-            <div
-              key={d.month}
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                position: "relative",
-                cursor: "pointer",
-                opacity: isDimmed ? 0.35 : 1,
-                transition: "opacity 200ms ease",
-              }}
-              onMouseEnter={() => setActiveMonth(d.month)}
-              onMouseLeave={() => setActiveMonth(null)}
-            >
-              {/* Tooltip */}
-              {isActive && (
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: Math.max(plannedH, realizedH) + 38,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    background: "var(--brand-navy)",
-                    color: "#fff",
-                    padding: "8px 12px",
-                    borderRadius: "var(--rounded-md)",
-                    fontSize: "var(--text-xs)",
-                    whiteSpace: "nowrap",
-                    zIndex: 10,
-                    boxShadow: "var(--elevation-md)",
-                    lineHeight: 1.6,
-                    pointerEvents: "none",
-                  }}
-                >
-                  <div style={{ fontWeight: 600, marginBottom: 2 }}>{d.month}</div>
-                  <div>
-                    <span style={{ color: "var(--brand-blue-border)" }}>Planned:</span>{" "}
-                    <span style={{ fontVariantNumeric: "tabular-nums" }}>{d.planned}L</span>
-                  </div>
-                  <div>
-                    <span style={{ color: "var(--brand-green-border)" }}>Realized:</span>{" "}
-                    <span style={{ fontVariantNumeric: "tabular-nums" }}>{d.realized}L</span>
-                  </div>
-                  {/* Arrow */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: -5,
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      width: 0,
-                      height: 0,
-                      borderLeft: "5px solid transparent",
-                      borderRight: "5px solid transparent",
-                      borderTop: "5px solid var(--brand-navy)",
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* Bar pair */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 3,
-                  alignItems: "flex-end",
-                  flex: 1,
-                  width: "100%",
-                  justifyContent: "center",
-                }}
-              >
-                <div
-                  style={{
-                    width: "38%",
-                    height: plannedH,
-                    borderRadius: "3px 3px 0 0",
-                    background: "var(--brand-blue)",
-                    transition: "box-shadow 200ms ease, height 300ms ease",
-                    boxShadow: isActive
-                      ? "0 0 8px rgba(52, 152, 219, 0.4)"
-                      : "none",
-                  }}
-                />
-                <div
-                  style={{
-                    width: "38%",
-                    height: realizedH,
-                    borderRadius: "3px 3px 0 0",
-                    background: "var(--brand-green)",
-                    transition: "box-shadow 200ms ease, height 300ms ease",
-                    boxShadow: isActive
-                      ? "0 0 8px rgba(39, 174, 96, 0.4)"
-                      : "none",
-                  }}
-                />
-              </div>
-
-              {/* Month label */}
-              <span
-                style={{
-                  position: "absolute",
-                  bottom: 4,
-                  fontSize: 10,
-                  color: isActive ? "var(--color-foreground)" : "var(--color-muted-foreground)",
-                  fontWeight: isActive ? 700 : 400,
-                  transition: "color 150ms, font-weight 150ms",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {d.month}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+function TrendTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div
+      style={{
+        background: T.fg,
+        color: "#fff",
+        padding: "10px 14px",
+        borderRadius: 8,
+        fontSize: 12,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+        fontFamily: T.font,
+        lineHeight: 1.6,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 11, opacity: 0.7 }}>{label}</div>
+      {payload.map((p: any, i: number) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 8, height: 3, borderRadius: 1, background: p.color, flexShrink: 0 }} />
+          <span style={{ opacity: 0.8 }}>{p.name}:</span>
+          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{p.value} Cr</span>
+        </div>
+      ))}
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Custom Donut Tooltip
+   DropdownSelector — small pill dropdown for chart headers
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function DonutTooltip({ active, payload }: any) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0];
+function DropdownSelector({ value, options }: { value: string; options?: string[] }) {
   return (
-    <div
+    <button
       style={{
-        background: "var(--brand-navy)",
-        color: "#fff",
-        padding: "8px 14px",
-        borderRadius: "var(--rounded-md)",
-        fontSize: "var(--text-xs)",
-        boxShadow: "var(--elevation-md)",
-        lineHeight: 1.5,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "5px 10px",
+        background: T.bg,
+        border: `1px solid ${T.border}`,
+        borderRadius: 6,
+        fontSize: 12,
+        fontWeight: 500,
+        color: T.muted,
+        fontFamily: T.font,
+        cursor: "pointer",
+        transition: "border-color 150ms",
       }}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = T.mutedLight)}
+      onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.border)}
     >
-      <span style={{ fontWeight: 600 }}>{d.name}</span>
-      <br />
-      <span style={{ fontVariantNumeric: "tabular-nums" }}>{d.value}%</span> of total
-    </div>
+      {value}
+      <ChevronDown size={12} />
+    </button>
   );
 }
 
@@ -493,13 +470,13 @@ export function Dashboard() {
   const [planDistribution, setPlanDistribution] = useState<any>(null);
   const [showAvatarEditor, setShowAvatarEditor] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"Overview" | "Benefits" | "Claims" | "Employees">("Overview");
 
   /* ─── Fetch ─────────────────────────────────────────────────────────── */
   const fetchDashboard = useCallback(async () => {
     try {
       setError(null);
 
-      // Check employees for setupRequired
       const empRes = await api.getEmployees();
       if (empRes.setupRequired) {
         setSetupRequired(true);
@@ -508,7 +485,6 @@ export function Dashboard() {
       }
       setSetupRequired(false);
 
-      // Fetch dashboard data
       const dashRes = await api.getDashboard();
       setKpis(dashRes.data.kpis);
       setRecentActivity(dashRes.data.recentActivity || []);
@@ -550,14 +526,6 @@ export function Dashboard() {
     );
   });
 
-  /* ─── Today's date formatted ────────────────────────────────────────── */
-  const todayFormatted = new Date().toLocaleDateString("en-IN", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
   /* ═══════════════════════════════════════════════════════════════════════
      LOADING STATE
      ═══════════════════════════════════════════════════════════════════════ */
@@ -570,21 +538,16 @@ export function Dashboard() {
           alignItems: "center",
           justifyContent: "center",
           minHeight: 480,
-          gap: "var(--space-4)",
-          color: "var(--color-muted-foreground)",
-          fontFamily: CSS.font,
+          gap: 16,
+          color: T.muted,
+          fontFamily: T.font,
         }}
       >
         <Loader2
           size={28}
-          style={{
-            animation: "spin 1s linear infinite",
-            color: "var(--brand-navy)",
-          }}
+          style={{ animation: "spin 1s linear infinite", color: T.accent }}
         />
-        <span style={{ fontSize: "var(--text-sm)", fontWeight: 500 }}>
-          Loading dashboard...
-        </span>
+        <span style={{ fontSize: 14, fontWeight: 500 }}>Loading dashboard...</span>
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     );
@@ -602,54 +565,42 @@ export function Dashboard() {
           alignItems: "center",
           justifyContent: "center",
           minHeight: 480,
-          gap: "var(--space-4)",
-          fontFamily: CSS.font,
+          gap: 16,
+          fontFamily: T.font,
         }}
       >
         <div
           style={{
             width: 56,
             height: 56,
-            borderRadius: "var(--rounded-full)",
-            background: "var(--brand-red-light)",
+            borderRadius: "50%",
+            background: T.redBg,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <AlertCircle size={24} style={{ color: "var(--brand-red)" }} />
+          <AlertCircle size={24} style={{ color: T.red }} />
         </div>
-        <p
-          style={{
-            fontSize: "var(--text-sm)",
-            color: "var(--color-muted-foreground)",
-            maxWidth: 360,
-            textAlign: "center",
-            lineHeight: 1.6,
-            margin: 0,
-          }}
-        >
+        <p style={{ fontSize: 14, color: T.muted, maxWidth: 360, textAlign: "center", lineHeight: 1.6, margin: 0 }}>
           {error}
         </p>
         <button
-          onClick={() => {
-            setLoading(true);
-            fetchDashboard();
-          }}
+          onClick={() => { setLoading(true); fetchDashboard(); }}
           style={{
-            padding: "8px 20px",
-            background: "var(--brand-navy)",
+            padding: "10px 24px",
+            background: T.accent,
             color: "#fff",
             border: "none",
-            borderRadius: "var(--rounded-md)",
-            fontSize: "var(--text-sm)",
+            borderRadius: 8,
+            fontSize: 14,
             fontWeight: 600,
-            fontFamily: CSS.font,
+            fontFamily: T.font,
             cursor: "pointer",
-            transition: "background 150ms",
+            transition: "opacity 150ms",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--brand-navy-hover)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "var(--brand-navy)")}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
         >
           Retry
         </button>
@@ -658,71 +609,43 @@ export function Dashboard() {
   }
 
   /* ═══════════════════════════════════════════════════════════════════════
-     KPI CARD CONFIG
+     KPI CONFIG
      ═══════════════════════════════════════════════════════════════════════ */
-  const kpiCards = [
+  const kpiMetrics = [
     {
-      key: "totalBenefitOutgo" as const,
-      title: "Total Benefit Outgo",
-      value: kpis?.totalBenefitOutgo || "₹18.2Cr",
-      icon: IndianRupee,
-      gradient: "linear-gradient(135deg, var(--brand-green), #1E8A4D)",
-      trend: "+12.5%",
+      label: "Total Benefit Outgo",
+      value: kpis?.totalBenefitOutgo || "\u20B918.2Cr",
+      trend: 7.4,
       trendUp: true,
-      context: "vs. last fiscal year",
-      accentGradient: "linear-gradient(90deg, var(--brand-green), var(--brand-blue))",
     },
     {
-      key: "avgTaxSaved" as const,
-      title: "Avg Tax Saved / Employee",
-      value: kpis?.avgTaxSaved || "₹3,20,000",
-      icon: ShieldCheck,
-      gradient: "linear-gradient(135deg, var(--brand-blue), #2372A8)",
-      trend: "+8.3%",
+      label: "Active Employees",
+      value: kpis?.activeEmployees ?? "2,859",
+      trend: 4.9,
       trendUp: true,
-      context: "across all benefit plans",
-      accentGradient: "linear-gradient(90deg, var(--brand-blue), var(--brand-purple))",
     },
     {
-      key: "pendingApprovals" as const,
-      title: "Pending Approvals",
-      value: kpis?.pendingApprovals ?? "24",
-      icon: Clock,
-      gradient: "linear-gradient(135deg, var(--brand-amber), #D4880D)",
-      trend: "-3",
+      label: "Claims Processed",
+      value: kpis?.claimsProcessed ?? "21,948",
+      trend: 11.7,
+      trendUp: true,
+    },
+    {
+      label: "Pending Approvals",
+      value: kpis?.pendingApprovals ?? "33",
+      trend: null, // displayed differently
       trendUp: false,
-      context: "requires your attention",
-      accentGradient: "linear-gradient(90deg, var(--brand-amber), var(--brand-orange))",
+      isWarning: true,
     },
     {
-      key: "activeEmployees" as const,
-      title: "Active Employees",
-      value: kpis?.activeEmployees ?? "342",
-      icon: Users,
-      gradient: "linear-gradient(135deg, var(--brand-navy), #243A4F)",
-      trend: "+18",
+      label: "Avg Tax Saved",
+      value: kpis?.avgTaxSaved || "\u20B93,20,000",
+      trend: 19.4,
       trendUp: true,
-      context: "enrolled in benefit plans",
-      accentGradient: "linear-gradient(90deg, var(--brand-navy), var(--brand-blue))",
     },
   ];
 
-  const visibleKpiCards = kpiCards.filter(
-    (card) => profile.dashboardCards[card.key]
-  );
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     PLAN DISTRIBUTION (from API or static fallback)
-     ═══════════════════════════════════════════════════════════════════════ */
-  const planDist = planDistribution || {
-    Standard: { count: 128, total: 342 },
-    Premium: { count: 145, total: 342 },
-    Executive: { count: 69, total: 342 },
-  };
-  const totalEmployees = Object.values(planDist).reduce(
-    (sum: number, p: any) => sum + (p.count || 0),
-    0
-  );
+  const tabs = ["Overview", "Benefits", "Claims", "Employees"] as const;
 
   /* ═══════════════════════════════════════════════════════════════════════
      RENDER
@@ -732,259 +655,201 @@ export function Dashboard() {
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: "var(--space-6)",
-        fontFamily: CSS.font,
+        gap: 24,
+        fontFamily: T.font,
         maxWidth: 1280,
+        color: T.fg,
       }}
     >
-      {/* ─── 1. WELCOME BANNER ──────────────────────────────────────────── */}
-      {profile.showGreeting && (
+      {/* ─── 1. PAGE HEADER ────────────────────────────────────────────── */}
+      <div>
         <div
           style={{
-            position: "relative",
-            background:
-              "radial-gradient(ellipse at 10% 90%, rgba(39,174,96,0.15) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(52,152,219,0.12) 0%, transparent 50%), linear-gradient(135deg, var(--brand-navy) 0%, #243A4F 100%)",
-            borderRadius: "var(--rounded-lg)",
-            padding: "var(--space-6) var(--space-8)",
-            color: "#fff",
-            overflow: "hidden",
-            /* Inset top highlight */
-            boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,0.08), var(--elevation-md)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
           }}
         >
-          <div
+          <h1
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: "var(--space-4)",
+              margin: 0,
+              fontSize: 24,
+              fontWeight: 600,
+              color: T.fg,
+              letterSpacing: "-0.02em",
+              lineHeight: 1.3,
             }}
           >
-            {/* Left: avatar + greeting */}
-            <div
+            Dashboard
+          </h1>
+
+          {/* Right: date range + filter + widgets */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
               style={{
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                gap: "var(--space-5)",
-              }}
-            >
-              {/* Avatar with editor toggle */}
-              <div style={{ position: "relative" }}>
-                <button
-                  onClick={() => setShowAvatarEditor(!showAvatarEditor)}
-                  style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: "var(--rounded-full)",
-                    background: profile.avatarColor,
-                    border: "2.5px solid rgba(255,255,255,0.25)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#fff",
-                    fontSize: "var(--text-lg)",
-                    fontWeight: 700,
-                    letterSpacing: "0.5px",
-                    cursor: "pointer",
-                    transition: "border-color 200ms, transform 200ms",
-                    fontFamily: CSS.font,
-                    padding: 0,
-                    position: "relative",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.5)";
-                    e.currentTarget.style.transform = "scale(1.05)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)";
-                    e.currentTarget.style.transform = "scale(1)";
-                  }}
-                  aria-label="Edit avatar"
-                >
-                  {profile.initials}
-                  {/* Tiny pencil overlay */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: -2,
-                      right: -2,
-                      width: 18,
-                      height: 18,
-                      borderRadius: "var(--rounded-full)",
-                      background: "var(--color-background)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      boxShadow: "var(--elevation-xs)",
-                    }}
-                  >
-                    <Pencil size={9} style={{ color: "var(--brand-navy)" }} />
-                  </div>
-                </button>
-
-                {showAvatarEditor && (
-                  <AvatarEditorPopover
-                    initials={profile.initials}
-                    avatarColor={profile.avatarColor}
-                    onSave={handleAvatarSave}
-                    onClose={() => setShowAvatarEditor(false)}
-                  />
-                )}
-              </div>
-
-              <div>
-                <h1
-                  style={{
-                    margin: 0,
-                    fontSize: "var(--text-xl)",
-                    fontWeight: 600,
-                    lineHeight: 1.3,
-                    letterSpacing: "-0.01em",
-                  }}
-                >
-                  {getTimeGreeting()}, {profile.name.split(" ")[0]}!
-                </h1>
-                <p
-                  style={{
-                    margin: "4px 0 0",
-                    fontSize: "var(--text-sm)",
-                    color: "rgba(255,255,255,0.6)",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {profile.designation} &middot; {profile.department}
-                </p>
-              </div>
-            </div>
-
-            {/* Right: date + edit link */}
-            <div
-              style={{
-                textAlign: "right",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-end",
                 gap: 6,
+                padding: "7px 14px",
+                background: T.card,
+                border: `1px solid ${T.border}`,
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 500,
+                color: T.fg,
+                fontFamily: T.font,
+                cursor: "pointer",
+                transition: "border-color 150ms",
               }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = T.mutedLight)}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.border)}
             >
-              <span
-                style={{
-                  fontSize: "var(--text-xs)",
-                  fontWeight: 500,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  color: "rgba(255,255,255,0.5)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <Calendar size={12} />
-                {todayFormatted}
-              </span>
-              <button
-                onClick={() => {/* navigate to profile */}}
-                style={{
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: "var(--rounded-md)",
-                  color: "rgba(255,255,255,0.8)",
-                  fontSize: "var(--text-xs)",
-                  fontWeight: 500,
-                  fontFamily: CSS.font,
-                  padding: "5px 14px",
-                  cursor: "pointer",
-                  transition: "background 150ms, color 150ms",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.14)";
-                  e.currentTarget.style.color = "#fff";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-                  e.currentTarget.style.color = "rgba(255,255,255,0.8)";
-                }}
-              >
-                Edit profile
-              </button>
-            </div>
+              <Calendar size={14} style={{ color: T.muted }} />
+              Apr 1, 2025 - Mar 31, 2026
+            </button>
+            <button
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
+                background: T.card,
+                border: `1px solid ${T.border}`,
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 500,
+                color: T.muted,
+                fontFamily: T.font,
+                cursor: "pointer",
+                transition: "border-color 150ms",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = T.mutedLight)}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.border)}
+            >
+              <Filter size={14} />
+              Filter
+            </button>
+            <button
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
+                background: T.card,
+                border: `1px solid ${T.border}`,
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 500,
+                color: T.muted,
+                fontFamily: T.font,
+                cursor: "pointer",
+                transition: "border-color 150ms",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = T.mutedLight)}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.border)}
+            >
+              <LayoutGrid size={14} />
+              Widgets
+            </button>
           </div>
         </div>
-      )}
 
-      {/* ─── SETUP REQUIRED STATE ───────────────────────────────────────── */}
+        {/* Tab bar */}
+        <div
+          style={{
+            display: "flex",
+            gap: 0,
+            borderBottom: `1px solid ${T.border}`,
+          }}
+        >
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: "10px 20px",
+                  fontSize: 14,
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? T.accent : T.muted,
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: isActive ? `2px solid ${T.accent}` : "2px solid transparent",
+                  cursor: "pointer",
+                  fontFamily: T.font,
+                  transition: "color 150ms",
+                  marginBottom: -1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) e.currentTarget.style.color = T.fg;
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) e.currentTarget.style.color = T.muted;
+                }}
+              >
+                {tab}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ─── SETUP REQUIRED STATE ──────────────────────────────────────── */}
       {setupRequired && (
         <div
           style={{
-            background: "var(--color-background)",
-            border: "1px dashed var(--color-border)",
-            borderRadius: "var(--rounded-lg)",
-            padding: "var(--space-8)",
+            ...cardStyle,
+            border: `1px dashed ${T.border}`,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             textAlign: "center",
             minHeight: 320,
-            gap: "var(--space-4)",
+            gap: 16,
           }}
         >
           <div
             style={{
               width: 64,
               height: 64,
-              borderRadius: "var(--rounded-full)",
-              background: "var(--brand-blue-light)",
+              borderRadius: "50%",
+              background: T.blueBg,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <Upload size={28} style={{ color: "var(--brand-blue)" }} />
+            <Upload size={28} style={{ color: T.blue }} />
           </div>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: "var(--text-lg)",
-              fontWeight: 600,
-              color: "var(--color-foreground)",
-            }}
-          >
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: T.fg }}>
             Welcome to SalarySe FlexiBenefits
           </h2>
-          <p
-            style={{
-              margin: 0,
-              fontSize: "var(--text-sm)",
-              color: "var(--color-muted-foreground)",
-              maxWidth: 400,
-              lineHeight: 1.6,
-            }}
-          >
+          <p style={{ margin: 0, fontSize: 14, color: T.muted, maxWidth: 400, lineHeight: 1.6 }}>
             Import employees to get started. Once you have employees enrolled in
             benefit plans, your dashboard analytics will appear here.
           </p>
           <button
             style={{
-              marginTop: "var(--space-2)",
+              marginTop: 8,
               padding: "10px 24px",
-              background: "var(--brand-navy)",
+              background: T.accent,
               color: "#fff",
               border: "none",
-              borderRadius: "var(--rounded-md)",
-              fontSize: "var(--text-sm)",
+              borderRadius: 8,
+              fontSize: 14,
               fontWeight: 600,
-              fontFamily: CSS.font,
+              fontFamily: T.font,
               cursor: "pointer",
-              transition: "background 150ms",
+              transition: "opacity 150ms",
               display: "flex",
               alignItems: "center",
               gap: 8,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--brand-navy-hover)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--brand-navy)")}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
           >
             <Upload size={14} />
             Import Employees
@@ -992,481 +857,424 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* ═══ MAIN DASHBOARD CONTENT (only when not setup required) ═══════ */}
+      {/* ═══ MAIN DASHBOARD CONTENT ═══════════════════════════════════════ */}
       {!setupRequired && (
         <>
-          {/* ─── 2. PLAN DISTRIBUTION STRIP ─────────────────────────────── */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: "var(--space-4)",
-            }}
-          >
-            {BENEFIT_PLANS.map((plan) => {
-              const meta = PLAN_META[plan];
-              const dist = planDist[plan] || { count: 0, total: totalEmployees };
-              const pct = totalEmployees > 0 ? Math.round((dist.count / totalEmployees) * 100) : 0;
+          {/* ─── 2. PERFORMANCE SUMMARY ───────────────────────────────── */}
+          <div style={cardStyle}>
+            <div style={{ marginBottom: 20 }}>
+              <h2 style={{ ...cardTitleStyle, fontSize: 16 }}>Performance summary</h2>
+              <p style={cardSubtitleStyle}>View your key benefit metrics</p>
+            </div>
 
-              return (
-                <div
-                  key={plan}
-                  style={{
-                    background: "var(--color-background)",
-                    borderRadius: "var(--rounded-lg)",
-                    border: "1px solid var(--color-border)",
-                    borderLeft: `3px solid ${meta.color}`,
-                    padding: "var(--space-5)",
-                    transition: CSS.cardTransition,
-                    cursor: "default",
-                    position: "relative",
-                    overflow: "hidden",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = "var(--elevation-md)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                >
-                  {/* Gradient swatch in top-right */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: -12,
-                      right: -12,
-                      width: 56,
-                      height: 56,
-                      borderRadius: "var(--rounded-full)",
-                      background: `linear-gradient(135deg, ${meta.color}22, ${meta.color}08)`,
-                      pointerEvents: "none",
-                    }}
-                  />
-
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      marginBottom: "var(--space-3)",
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontSize: "var(--text-xl)",
-                          fontWeight: 700,
-                          color: "var(--color-foreground)",
-                          lineHeight: 1.2,
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {dist.count}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "var(--text-xs)",
-                          color: "var(--color-muted-foreground)",
-                          marginTop: 2,
-                        }}
-                      >
-                        employees
-                      </div>
-                    </div>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 600,
-                        color: meta.color,
-                        background: meta.bgColor,
-                        border: `1px solid ${meta.borderColor}`,
-                        borderRadius: "var(--rounded-full)",
-                        padding: "2px 10px",
-                        letterSpacing: "0.02em",
-                        lineHeight: "18px",
-                      }}
-                    >
-                      {meta.label}
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "var(--color-muted-foreground)",
-                      marginBottom: 8,
-                    }}
-                  >
-                    {meta.bracketRange}
-                  </div>
-
-                  {/* Progress bar */}
-                  <div
-                    style={{
-                      height: 6,
-                      borderRadius: 3,
-                      background: "var(--color-card)",
-                      overflow: "hidden",
-                      marginBottom: 6,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${pct}%`,
-                        height: "100%",
-                        borderRadius: 3,
-                        background: meta.color,
-                        boxShadow: `0 0 6px ${meta.color}40`,
-                        transition: "width 500ms ease",
-                      }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "var(--color-muted-foreground)",
-                      textAlign: "right",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {pct}%
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* ─── 3. KPI CARDS ───────────────────────────────────────────── */}
-          {visibleKpiCards.length > 0 && (
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: `repeat(${Math.min(visibleKpiCards.length, 4)}, 1fr)`,
-                gap: "var(--space-4)",
+                gridTemplateColumns: `repeat(${kpiMetrics.length}, 1fr)`,
+                gap: 0,
+                borderTop: `1px solid ${T.border}`,
+                paddingTop: 20,
               }}
             >
-              {visibleKpiCards.map((card) => {
-                const Icon = card.icon;
-                return (
+              {kpiMetrics.map((kpi, idx) => (
+                <div
+                  key={kpi.label}
+                  style={{
+                    padding: "0 20px",
+                    borderRight: idx < kpiMetrics.length - 1 ? `1px solid ${T.border}` : "none",
+                    /* First item needs no left padding */
+                    ...(idx === 0 ? { paddingLeft: 0 } : {}),
+                    /* Last item needs no right padding */
+                    ...(idx === kpiMetrics.length - 1 ? { paddingRight: 0 } : {}),
+                  }}
+                >
                   <div
-                    key={card.key}
                     style={{
-                      background: "var(--color-background)",
-                      borderRadius: "var(--rounded-lg)",
-                      border: "1px solid var(--color-border)",
-                      padding: "var(--space-5)",
-                      position: "relative",
-                      overflow: "hidden",
-                      transition: CSS.cardTransition,
-                      cursor: "default",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = "var(--elevation-md)";
-                      e.currentTarget.style.borderColor = "var(--brand-navy-alpha-20)";
-                      const icon = e.currentTarget.querySelector("[data-kpi-icon]") as HTMLElement;
-                      if (icon) icon.style.transform = "scale(1.05)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = "none";
-                      e.currentTarget.style.borderColor = "var(--color-border)";
-                      const icon = e.currentTarget.querySelector("[data-kpi-icon]") as HTMLElement;
-                      if (icon) icon.style.transform = "scale(1)";
+                      fontSize: 13,
+                      color: T.muted,
+                      fontWeight: 400,
+                      marginBottom: 8,
+                      lineHeight: 1.3,
                     }}
                   >
-                    {/* 2px top accent gradient */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: 2,
-                        background: card.accentGradient,
-                      }}
-                    />
-
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        marginBottom: "var(--space-3)",
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <div
-                          style={{
-                            fontSize: "var(--text-xs)",
-                            color: "var(--color-muted-foreground)",
-                            fontWeight: 500,
-                            marginBottom: 6,
-                            letterSpacing: "0.01em",
-                          }}
-                        >
-                          {card.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "var(--text-2xl)",
-                            fontWeight: 700,
-                            color: "var(--color-foreground)",
-                            lineHeight: 1.1,
-                            fontVariantNumeric: "tabular-nums",
-                            letterSpacing: "-0.02em",
-                          }}
-                        >
-                          {card.value}
-                        </div>
-                      </div>
-
-                      {/* Icon container */}
-                      <div
-                        data-kpi-icon=""
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: "var(--rounded-lg)",
-                          background: card.gradient,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          transition: "transform 200ms ease",
-                        }}
-                      >
-                        <Icon size={20} style={{ color: "#fff" }} />
-                      </div>
-                    </div>
-
-                    {/* Trend pill */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        marginBottom: "var(--space-3)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 3,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: card.trendUp ? "var(--brand-green)" : "var(--brand-red)",
-                          background: card.trendUp
-                            ? "var(--brand-green-light)"
-                            : "var(--brand-red-light)",
-                          borderRadius: "var(--rounded-full)",
-                          padding: "2px 8px",
-                          lineHeight: "16px",
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {card.trendUp ? (
-                          <TrendingUp size={11} />
-                        ) : (
-                          <TrendingDown size={11} />
-                        )}
-                        {card.trend}
-                      </span>
-                    </div>
-
-                    {/* Separator + context */}
-                    <div
-                      style={{
-                        borderTop: "1px solid var(--color-border)",
-                        paddingTop: "var(--space-3)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: "var(--color-muted-foreground)",
-                        }}
-                      >
-                        {card.context}
-                      </span>
-                    </div>
+                    {kpi.label}
                   </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* ─── 4. CHARTS ROW ──────────────────────────────────────────── */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "2fr 3fr",
-              gap: "var(--space-4)",
-            }}
-          >
-            {/* Donut chart */}
-            <div
-              style={{
-                background: "var(--color-background)",
-                borderRadius: "var(--rounded-lg)",
-                border: "1px solid var(--color-border)",
-                padding: "var(--space-5)",
-              }}
-            >
-              <h3
-                style={{
-                  margin: "0 0 var(--space-4)",
-                  fontSize: "var(--text-sm)",
-                  fontWeight: 600,
-                  color: "var(--color-foreground)",
-                }}
-              >
-                Benefit Distribution by Category
-              </h3>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--space-4)",
-                }}
-              >
-                <div style={{ width: 160, height: 160, flexShrink: 0 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={DONUT_DATA}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={42}
-                        outerRadius={72}
-                        paddingAngle={2}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        {DONUT_DATA.map((entry, i) => (
-                          <Cell key={i} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<DonutTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Legend */}
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                  {DONUT_DATA.map((item) => (
-                    <div
-                      key={item.name}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "5px 8px",
-                        borderRadius: "var(--rounded-sm)",
-                        transition: "background 150ms",
-                        cursor: "default",
-                      }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background = "var(--color-card)")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = "transparent")
-                      }
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: 2,
-                            background: item.color,
-                            flexShrink: 0,
-                          }}
-                        />
+                  <div
+                    style={{
+                      fontSize: 28,
+                      fontWeight: 700,
+                      color: T.fg,
+                      lineHeight: 1.1,
+                      fontVariantNumeric: "tabular-nums",
+                      letterSpacing: "-0.02em",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {kpi.value}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: 12,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {kpi.isWarning ? (
+                      <>
+                        <ArrowUpRight size={14} style={{ color: T.amber }} />
+                        <span style={{ color: T.amber, fontWeight: 600 }}>&uarr;</span>
+                        <span style={{ color: T.muted }}>from last month</span>
+                      </>
+                    ) : (
+                      <>
+                        {kpi.trendUp ? (
+                          <ArrowUpRight size={14} style={{ color: T.green }} />
+                        ) : (
+                          <ArrowDownRight size={14} style={{ color: T.red }} />
+                        )}
                         <span
                           style={{
-                            fontSize: "var(--text-xs)",
-                            color: "var(--color-foreground)",
+                            color: kpi.trendUp ? T.green : T.red,
+                            fontWeight: 600,
+                            fontVariantNumeric: "tabular-nums",
                           }}
                         >
-                          {item.name}
+                          {kpi.trendUp ? "+" : "-"}{kpi.trend}%
                         </span>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: "var(--text-xs)",
-                          fontWeight: 600,
-                          color: "var(--color-muted-foreground)",
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {item.value}%
-                      </span>
-                    </div>
-                  ))}
+                        <span style={{ color: T.muted }}>than last month</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Bar chart */}
-            <div
-              style={{
-                background: "var(--color-background)",
-                borderRadius: "var(--rounded-lg)",
-                border: "1px solid var(--color-border)",
-                padding: "var(--space-5)",
-              }}
-            >
-              <h3
-                style={{
-                  margin: "0 0 var(--space-2)",
-                  fontSize: "var(--text-sm)",
-                  fontWeight: 600,
-                  color: "var(--color-foreground)",
-                }}
-              >
-                Planned vs Realized Benefits (₹ Lakhs)
-              </h3>
-              <PlannedRealizedChart />
+              ))}
             </div>
           </div>
 
-          {/* ─── 5. RECENT ACTIVITY FEED ────────────────────────────────── */}
-          <div
-            style={{
-              background: "var(--color-background)",
-              borderRadius: "var(--rounded-lg)",
-              border: "1px solid var(--color-border)",
-              padding: "var(--space-5)",
-            }}
-          >
-            {/* Header */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: "var(--space-4)",
-              }}
-            >
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: "var(--text-sm)",
-                  fontWeight: 600,
-                  color: "var(--color-foreground)",
-                }}
-              >
-                Recent Approval Activity
-              </h3>
+          {/* ─── 3. CHARTS ROW 1 ──────────────────────────────────────── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            {/* Benefit Utilization — Area chart */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <div>
+                  <h3 style={cardTitleStyle}>Benefit Utilization</h3>
+                  <p style={cardSubtitleStyle}>Category-wise usage trends</p>
+                </div>
+                <button
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    border: `1px solid ${T.border}`,
+                    background: "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    color: T.muted,
+                    transition: "background 150ms",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+              </div>
+
+              <div style={{ width: "100%", height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={UTILIZATION_DATA} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="gradFood" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={T.accent} stopOpacity={0.15} />
+                        <stop offset="95%" stopColor={T.accent} stopOpacity={0.01} />
+                      </linearGradient>
+                      <linearGradient id="gradFuel" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={T.blue} stopOpacity={0.15} />
+                        <stop offset="95%" stopColor={T.blue} stopOpacity={0.01} />
+                      </linearGradient>
+                      <linearGradient id="gradComm" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={T.green} stopOpacity={0.15} />
+                        <stop offset="95%" stopColor={T.green} stopOpacity={0.01} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={T.border} vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                      tickFormatter={(v) => `${v}%`}
+                      domain={[0, 60]}
+                    />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Area
+                      type="monotone"
+                      dataKey="food"
+                      name="Food"
+                      stroke={T.accent}
+                      strokeWidth={2}
+                      fill="url(#gradFood)"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 2, fill: T.card }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="fuel"
+                      name="Fuel"
+                      stroke={T.blue}
+                      strokeWidth={2}
+                      fill="url(#gradFuel)"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 2, fill: T.card }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="communication"
+                      name="Communication"
+                      stroke={T.green}
+                      strokeWidth={2}
+                      fill="url(#gradComm)"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 2, fill: T.card }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Legend */}
+              <div style={{ display: "flex", gap: 20, marginTop: 12, justifyContent: "center" }}>
+                {[
+                  { label: "Food", color: T.accent },
+                  { label: "Fuel", color: T.blue },
+                  { label: "Communication", color: T.green },
+                ].map((item) => (
+                  <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: item.color }} />
+                    <span style={{ fontSize: 12, color: T.muted }}>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Claims Overview — Area chart */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <div>
+                  <h3 style={cardTitleStyle}>Claims Overview</h3>
+                  <p style={cardSubtitleStyle}>Volume of claims processed</p>
+                </div>
+                <DropdownSelector value="Last month" />
+              </div>
+
+              <div style={{ width: "100%", height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={CLAIMS_OVERVIEW_DATA} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="gradClaims" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={T.blue} stopOpacity={0.2} />
+                        <stop offset="95%" stopColor={T.blue} stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={T.border} vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                      tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+                      domain={[0, 15000]}
+                    />
+                    <Tooltip content={<SingleLineTooltip />} />
+                    <Area
+                      type="monotone"
+                      dataKey="claims"
+                      name="Claims"
+                      stroke={T.blue}
+                      strokeWidth={2}
+                      fill="url(#gradClaims)"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 2, fill: T.card }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {/* ─── 4. CHARTS ROW 2 ──────────────────────────────────────── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            {/* Plan Distribution — Horizontal stacked bar */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <div>
+                  <h3 style={cardTitleStyle}>Plan Distribution</h3>
+                  <p style={cardSubtitleStyle}>Breakdown by department</p>
+                </div>
+                <button
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    border: `1px solid ${T.border}`,
+                    background: "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    color: T.muted,
+                    transition: "background 150ms",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+              </div>
+
+              <div style={{ width: "100%", height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={PLAN_DISTRIBUTION_DATA}
+                    layout="vertical"
+                    margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                    barSize={18}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke={T.border} horizontal={false} />
+                    <XAxis
+                      type="number"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="dept"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                      width={80}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(0,0,0,0.02)" }}
+                      contentStyle={{
+                        background: T.fg,
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 8,
+                        fontSize: 12,
+                        fontFamily: T.font,
+                      }}
+                      itemStyle={{ color: "#fff" }}
+                      labelStyle={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}
+                    />
+                    <Bar dataKey="standard" name="Standard" stackId="a" fill={PLAN_META.Standard.color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="premium" name="Premium" stackId="a" fill={PLAN_META.Premium.color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="executive" name="Executive" stackId="a" fill={PLAN_META.Executive.color} radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Legend */}
+              <div style={{ display: "flex", gap: 20, marginTop: 12, justifyContent: "center" }}>
+                {BENEFIT_PLANS.map((plan) => (
+                  <div key={plan} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: PLAN_META[plan].color }} />
+                    <span style={{ fontSize: 12, color: T.muted }}>{plan}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Benefit Trend — Line chart with dashed target */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <div>
+                  <h3 style={cardTitleStyle}>Benefit Trend</h3>
+                  <p style={cardSubtitleStyle}>Actual vs target (in Crores)</p>
+                </div>
+                <DropdownSelector value="Last month" />
+              </div>
+
+              <div style={{ width: "100%", height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={BENEFIT_TREND_DATA} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={T.border} vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                      tickFormatter={(v) => `${v}`}
+                    />
+                    <Tooltip content={<TrendTooltip />} />
+                    <Line
+                      type="monotone"
+                      dataKey="target"
+                      name="Target"
+                      stroke={T.mutedLight}
+                      strokeWidth={2}
+                      strokeDasharray="6 4"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 2, fill: T.card }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="actual"
+                      name="Actual"
+                      stroke={T.accent}
+                      strokeWidth={2.5}
+                      dot={false}
+                      activeDot={{ r: 5, strokeWidth: 2, fill: T.card }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Legend */}
+              <div style={{ display: "flex", gap: 20, marginTop: 12, justifyContent: "center" }}>
+                {[
+                  { label: "Actual", color: T.accent, dashed: false },
+                  { label: "Target", color: T.mutedLight, dashed: true },
+                ].map((item) => (
+                  <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div
+                      style={{
+                        width: 16,
+                        height: 0,
+                        borderTop: `2px ${item.dashed ? "dashed" : "solid"} ${item.color}`,
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: T.muted }}>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ─── 5. RECENT ACTIVITY TABLE ─────────────────────────────── */}
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <div>
+                <h3 style={cardTitleStyle}>Recent Activity</h3>
+                <p style={cardSubtitleStyle}>Latest benefit claims and approvals</p>
+              </div>
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
@@ -1475,225 +1283,214 @@ export function Dashboard() {
                   alignItems: "center",
                   gap: 6,
                   background: "transparent",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--rounded-md)",
-                  padding: "5px 12px",
-                  fontSize: "var(--text-xs)",
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 8,
+                  padding: "6px 14px",
+                  fontSize: 13,
                   fontWeight: 500,
-                  color: "var(--color-muted-foreground)",
-                  fontFamily: CSS.font,
+                  color: T.muted,
+                  fontFamily: T.font,
                   cursor: refreshing ? "default" : "pointer",
                   opacity: refreshing ? 0.6 : 1,
                   transition: "background 150ms, border-color 150ms",
                 }}
                 onMouseEnter={(e) => {
                   if (!refreshing) {
-                    e.currentTarget.style.background = "var(--color-card)";
-                    e.currentTarget.style.borderColor = "var(--color-muted-foreground)";
+                    e.currentTarget.style.background = T.bg;
+                    e.currentTarget.style.borderColor = T.mutedLight;
                   }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.borderColor = "var(--color-border)";
+                  e.currentTarget.style.borderColor = T.border;
                 }}
               >
                 <RefreshCw
-                  size={12}
-                  style={{
-                    animation: refreshing ? "spin 1s linear infinite" : "none",
-                  }}
+                  size={13}
+                  style={{ animation: refreshing ? "spin 1s linear infinite" : "none" }}
                 />
                 Refresh
               </button>
             </div>
 
-            {/* Activity rows */}
             {filteredActivity.length === 0 ? (
+              /* Empty state */
               <div
                 style={{
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  padding: "var(--space-8) var(--space-4)",
-                  color: "var(--color-muted-foreground)",
+                  padding: "48px 16px",
+                  color: T.muted,
                   textAlign: "center",
                 }}
               >
-                <Clock
-                  size={32}
-                  style={{
-                    color: "var(--color-border)",
-                    marginBottom: "var(--space-3)",
-                  }}
-                />
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: "var(--text-sm)",
-                    fontWeight: 500,
-                  }}
-                >
-                  {query
-                    ? "No activity matching your search"
-                    : "No recent activity"}
+                <FileText size={32} style={{ color: T.border, marginBottom: 12 }} />
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
+                  {query ? "No activity matching your search" : "No recent activity"}
                 </p>
-                <p
-                  style={{
-                    margin: "4px 0 0",
-                    fontSize: "var(--text-xs)",
-                  }}
-                >
-                  {query
-                    ? "Try adjusting your search query"
-                    : "Approval actions will appear here"}
+                <p style={{ margin: "4px 0 0", fontSize: 12 }}>
+                  {query ? "Try adjusting your search query" : "Approval actions will appear here"}
                 </p>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                {filteredActivity.map((item, idx) => {
-                  const isApproved =
-                    item.action === "approved" || item.status === "approved";
-                  const isRejected =
-                    item.action === "rejected" || item.status === "rejected";
-                  const statusColor = isApproved
-                    ? "var(--brand-green)"
-                    : isRejected
-                    ? "var(--brand-red)"
-                    : "var(--brand-amber)";
-                  const statusBg = isApproved
-                    ? "var(--brand-green-light)"
-                    : isRejected
-                    ? "var(--brand-red-light)"
-                    : "var(--brand-amber-light)";
-                  const StatusIcon = isApproved ? Check : isRejected ? X : Clock;
-
-                  return (
-                    <div
-                      key={item.claimId || idx}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "var(--space-4)",
-                        padding: "var(--space-3) var(--space-2)",
-                        borderBottom:
-                          idx < filteredActivity.length - 1
-                            ? "1px solid var(--color-border)"
-                            : "none",
-                        borderRadius: "var(--rounded-sm)",
-                        transition: "background 150ms",
-                        cursor: "default",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "var(--color-card)";
-                        /* Dim separators on hover */
-                        const border = e.currentTarget.style;
-                        if (idx < filteredActivity.length - 1) {
-                          border.borderBottomColor = "rgba(226,226,226,0.5)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "transparent";
-                        if (idx < filteredActivity.length - 1) {
-                          e.currentTarget.style.borderBottomColor = "var(--color-border)";
-                        }
-                      }}
-                    >
-                      {/* Status icon */}
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: "var(--rounded-full)",
-                          background: statusBg,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          boxShadow: `0 0 0 3px ${statusBg}`,
-                        }}
-                      >
-                        <StatusIcon size={14} style={{ color: statusColor }} />
-                      </div>
-
-                      {/* Details */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
+              /* Table */
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 13,
+                    fontFamily: T.font,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      {["Employee", "Benefit Type", "Amount", "Status", "Date"].map((col) => (
+                        <th
+                          key={col}
                           style={{
-                            fontSize: "var(--text-sm)",
-                            color: "var(--color-foreground)",
-                            lineHeight: 1.5,
+                            textAlign: "left",
+                            padding: "10px 12px",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: T.muted,
+                            borderBottom: `1px solid ${T.border}`,
+                            letterSpacing: "0.02em",
+                            textTransform: "uppercase",
+                            whiteSpace: "nowrap",
+                            cursor: "pointer",
+                            userSelect: "none",
                           }}
                         >
-                          <span style={{ color: statusColor, fontWeight: 600 }}>
-                            {isApproved
-                              ? "Approved"
-                              : isRejected
-                              ? "Rejected"
-                              : "Pending"}
-                          </span>{" "}
-                          claim for{" "}
-                          <span style={{ fontWeight: 600 }}>
-                            {item.employeeName}
-                          </span>
-                          {item.type && (
-                            <>
-                              {" "}&middot;{" "}
-                              <span style={{ color: "var(--color-muted-foreground)" }}>
-                                {item.type}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        <div
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredActivity.map((item, idx) => {
+                      const isApproved = item.action === "approved" || item.status === "approved";
+                      const isRejected = item.action === "rejected" || item.status === "rejected";
+                      const isPending = !isApproved && !isRejected;
+                      const statusLabel = isApproved ? "Approved" : isRejected ? "Rejected" : "Pending";
+                      const statusColor = isApproved ? T.green : isRejected ? T.red : T.amber;
+                      const statusBg = isApproved ? T.greenBg : isRejected ? T.redBg : T.amberBg;
+
+                      return (
+                        <tr
+                          key={item.claimId || idx}
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "var(--space-3)",
-                            marginTop: 4,
-                            fontSize: "var(--text-xs)",
-                            color: "var(--color-muted-foreground)",
+                            transition: "background 150ms",
+                            cursor: "default",
                           }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                         >
-                          {item.claimId && (
+                          {/* Employee */}
+                          <td
+                            style={{
+                              padding: "12px 12px",
+                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
+                              fontWeight: 500,
+                              color: T.fg,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div
+                                style={{
+                                  width: 30,
+                                  height: 30,
+                                  borderRadius: "50%",
+                                  background: item.avatarColor || T.blue,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "#fff",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  flexShrink: 0,
+                                  letterSpacing: "0.5px",
+                                }}
+                              >
+                                {item.initials || (item.employeeName || "").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                              </div>
+                              <span>{item.employeeName}</span>
+                            </div>
+                          </td>
+
+                          {/* Benefit Type */}
+                          <td
+                            style={{
+                              padding: "12px 12px",
+                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
+                              color: T.muted,
+                            }}
+                          >
+                            {item.type || item.category || "--"}
+                          </td>
+
+                          {/* Amount */}
+                          <td
+                            style={{
+                              padding: "12px 12px",
+                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
+                              fontWeight: 600,
+                              fontVariantNumeric: "tabular-nums",
+                              color: T.fg,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.amount || "--"}
+                          </td>
+
+                          {/* Status badge */}
+                          <td
+                            style={{
+                              padding: "12px 12px",
+                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
+                            }}
+                          >
                             <span
                               style={{
-                                background: "var(--color-card)",
-                                border: "1px solid var(--color-border)",
-                                borderRadius: "var(--rounded-sm)",
-                                padding: "1px 7px",
-                                fontSize: 10,
-                                fontWeight: 500,
-                                fontVariantNumeric: "tabular-nums",
-                                letterSpacing: "0.02em",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                padding: "3px 10px",
+                                borderRadius: 100,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: statusColor,
+                                background: statusBg,
+                                lineHeight: "16px",
                               }}
                             >
-                              {item.claimId}
+                              {isApproved && <Check size={11} />}
+                              {isRejected && <X size={11} />}
+                              {isPending && <Clock size={11} />}
+                              {statusLabel}
                             </span>
-                          )}
-                          {item.timestamp && (
-                            <span>{item.timestamp}</span>
-                          )}
-                        </div>
-                      </div>
+                          </td>
 
-                      {/* Amount */}
-                      {item.amount && (
-                        <div
-                          style={{
-                            fontSize: "var(--text-sm)",
-                            fontWeight: 700,
-                            color: "var(--color-foreground)",
-                            fontVariantNumeric: "tabular-nums",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {item.amount}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                          {/* Date */}
+                          <td
+                            style={{
+                              padding: "12px 12px",
+                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
+                              color: T.muted,
+                              fontSize: 12,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.timestamp || item.dateSubmitted || "--"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

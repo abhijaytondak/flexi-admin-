@@ -11,6 +11,13 @@
   --text-3xl: 36px;
 
   /* ─── Brand Colors ───────────────────────────────────────────────── */
+  --brand-accent: #E8683A;
+  --brand-accent-hover: #D55A2E;
+  --brand-accent-light: #FDF0EB;
+  --brand-accent-alpha-8: rgba(232, 104, 58, 0.08);
+  --brand-accent-alpha-12: rgba(232, 104, 58, 0.12);
+  --brand-accent-alpha-20: rgba(232, 104, 58, 0.20);
+
   --brand-navy: #1A2B3C;
   --brand-navy-hover: #243A4F;
   --brand-navy-dark: #152332;
@@ -42,12 +49,12 @@
   --brand-orange-light: #FEF3E7;
 
   /* ─── Sidebar ────────────────────────────────────────────────────── */
-  --sidebar-bg: #1A2B3C;
-  --sidebar-text: #fff;
-  --sidebar-text-muted: #8B9DB5;
-  --sidebar-active-bg: rgba(255, 255, 255, 0.12);
-  --sidebar-hover-bg: rgba(255, 255, 255, 0.05);
-  --sidebar-divider: rgba(255, 255, 255, 0.10);
+  --sidebar-bg: #FFFFFF;
+  --sidebar-text: #1A1A1A;
+  --sidebar-text-muted: #6B7280;
+  --sidebar-active-bg: rgba(232, 104, 58, 0.08);
+  --sidebar-hover-bg: #F9FAFB;
+  --sidebar-divider: #F0F0F0;
 
   /* ─── Plan Colors ────────────────────────────────────────────────── */
   --plan-standard-color: #6B7A8D;
@@ -64,27 +71,28 @@
 
   /* ─── Semantic Surface ───────────────────────────────────────────── */
   --color-background: #FFFFFF;
-  --color-foreground: #161616;
-  --color-card: #F4F4F4;
-  --color-card-foreground: #161616;
-  --color-border: #E2E2E2;
-  --color-muted-foreground: #6F6F6F;
+  --color-foreground: #1A1A1A;
+  --color-surface: #FAFAFA;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #1A1A1A;
+  --color-border: #EBEBEB;
+  --color-muted-foreground: #6B7280;
   --color-destructive: #DA1E28;
-  --color-primary: #1A2B3C;
+  --color-primary: #E8683A;
   --color-primary-foreground: #FFFFFF;
 
-  /* ─── Elevation ──────────────────────────────────────────────────── */
-  --elevation-xs: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --elevation-sm: 0 2px 6px rgba(0, 0, 0, 0.08);
-  --elevation-md: 0 4px 16px rgba(0, 0, 0, 0.10);
-  --elevation-lg: 0 8px 32px rgba(26, 43, 60, 0.16);
-  --elevation-xl: 0 16px 48px rgba(26, 43, 60, 0.20);
+  /* ─── Elevation — deliberately subtle, border-first design ──────── */
+  --elevation-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --elevation-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --elevation-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --elevation-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --elevation-xl: 0 8px 24px rgba(0, 0, 0, 0.10);
 
-  /* ─── Radius ─────────────────────────────────────────────────────── */
+  /* ─── Radius — generous, modern corners ─────────────────────────── */
   --rounded-sm: 4px;
-  --rounded-md: 6px;
-  --rounded-lg: 10px;
-  --rounded-xl: 14px;
+  --rounded-md: 8px;
+  --rounded-lg: 12px;
+  --rounded-xl: 16px;
   --rounded-full: 9999px;
 
   /* ─── Spacing ────────────────────────────────────────────────────── */
@@ -95,6 +103,24 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+
+  /* ─── Nav Icon Badge Colors (tinted backgrounds per icon) ────────── */
+  --icon-dashboard-bg: rgba(232, 104, 58, 0.10);
+  --icon-dashboard-fg: #E8683A;
+  --icon-policy-bg: rgba(59, 130, 246, 0.10);
+  --icon-policy-fg: #3B82F6;
+  --icon-approval-bg: rgba(16, 185, 129, 0.10);
+  --icon-approval-fg: #10B981;
+  --icon-payroll-bg: rgba(139, 92, 246, 0.10);
+  --icon-payroll-fg: #8B5CF6;
+  --icon-analytics-bg: rgba(245, 158, 11, 0.10);
+  --icon-analytics-fg: #F59E0B;
+  --icon-employees-bg: rgba(6, 182, 212, 0.10);
+  --icon-employees-fg: #06B6D4;
+  --icon-settings-bg: rgba(107, 114, 128, 0.10);
+  --icon-settings-fg: #6B7280;
+  --icon-help-bg: rgba(107, 114, 128, 0.10);
+  --icon-help-fg: #6B7280;
 }
 
 @layer base {
@@ -103,7 +129,7 @@
   }
   body {
     margin: 0;
-    background-color: var(--color-background);
+    background-color: var(--color-surface);
     color: var(--color-foreground);
     font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     font-size: var(--text-base);

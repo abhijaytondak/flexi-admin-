@@ -11,6 +11,11 @@ import {
   Search,
   Bell,
   ChevronRight,
+  HelpCircle,
+  Home,
+  ChevronsUpDown,
+  Filter,
+  Calendar,
 } from "lucide-react";
 import { UserProfileProvider, useUserProfile } from "../contexts/UserProfileContext";
 import { SearchProvider, useSearch } from "../contexts/SearchContext";
@@ -18,15 +23,64 @@ import { NotificationDrawer } from "./NotificationDrawer";
 
 // ─── Nav Items ──────────────────────────────────────────────────────────────
 
-const NAV_ITEMS = [
-  { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/policy", label: "Policy Engine", icon: FileText },
-  { path: "/approvals", label: "Approval Queue", icon: ClipboardCheck },
-  { path: "/payroll", label: "Payroll Export", icon: Download },
-  { path: "/analytics", label: "Analytics", icon: BarChart3 },
-  { path: "/employees", label: "Employee Directory", icon: Users },
-  { path: "/settings", label: "Settings", icon: Settings },
+const MAIN_NAV_ITEMS = [
+  {
+    path: "/",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    badge: "9",
+    iconBg: "var(--icon-dashboard-bg)",
+    iconFg: "var(--icon-dashboard-fg)",
+  },
+  {
+    path: "/policy",
+    label: "Policy Engine",
+    icon: FileText,
+    iconBg: "var(--icon-policy-bg)",
+    iconFg: "var(--icon-policy-fg)",
+  },
+  {
+    path: "/approvals",
+    label: "Approval Queue",
+    icon: ClipboardCheck,
+    iconBg: "var(--icon-approval-bg)",
+    iconFg: "var(--icon-approval-fg)",
+  },
+  {
+    path: "/payroll",
+    label: "Payroll Export",
+    icon: Download,
+    iconBg: "var(--icon-payroll-bg)",
+    iconFg: "var(--icon-payroll-fg)",
+  },
+  {
+    path: "/analytics",
+    label: "Analytics",
+    icon: BarChart3,
+    iconBg: "var(--icon-analytics-bg)",
+    iconFg: "var(--icon-analytics-fg)",
+  },
+  {
+    path: "/employees",
+    label: "Employee Directory",
+    icon: Users,
+    iconBg: "var(--icon-employees-bg)",
+    iconFg: "var(--icon-employees-fg)",
+  },
 ] as const;
+
+const BOTTOM_NAV_ITEMS = [
+  {
+    path: "/settings",
+    label: "Settings",
+    icon: Settings,
+    iconBg: "var(--icon-settings-bg)",
+    iconFg: "var(--icon-settings-fg)",
+  },
+] as const;
+
+// Combined for route matching
+const NAV_ITEMS = [...MAIN_NAV_ITEMS, ...BOTTOM_NAV_ITEMS];
 
 function getPageTitle(pathname: string): string {
   if (pathname === "/") return "Dashboard";
@@ -43,19 +97,115 @@ function LoadingSpinner() {
   return (
     <div
       className="flex items-center justify-center"
-      style={{ minHeight: "calc(100vh - 60px)" }}
+      style={{ minHeight: "calc(100vh - 56px)" }}
     >
       <div
         className="animate-spin"
         style={{
-          width: 32,
-          height: 32,
-          border: "3px solid var(--color-border)",
-          borderTopColor: "var(--brand-navy)",
+          width: 28,
+          height: 28,
+          border: "2.5px solid var(--color-border)",
+          borderTopColor: "var(--brand-accent)",
           borderRadius: "var(--rounded-full)",
         }}
       />
     </div>
+  );
+}
+
+// ─── Sidebar Nav Item ───────────────────────────────────────────────────────
+
+function SidebarNavItem({
+  path,
+  label,
+  icon: Icon,
+  badge,
+  iconBg,
+  iconFg,
+}: {
+  path: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
+  badge?: string;
+  iconBg: string;
+  iconFg: string;
+}) {
+  return (
+    <NavLink
+      to={path}
+      end={path === "/"}
+      className="flex items-center gap-3 transition-colors duration-150"
+      style={({ isActive }) => ({
+        padding: "8px 12px",
+        borderRadius: 8,
+        fontSize: "var(--text-sm)",
+        fontWeight: isActive ? 500 : 400,
+        color: isActive ? "var(--sidebar-text)" : "var(--sidebar-text-muted)",
+        backgroundColor: isActive ? "var(--sidebar-active-bg)" : "transparent",
+        textDecoration: "none",
+        marginBottom: 2,
+        cursor: "pointer",
+      })}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget;
+        if (!el.getAttribute("aria-current")) {
+          el.style.backgroundColor = "var(--sidebar-hover-bg)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget;
+        if (!el.getAttribute("aria-current")) {
+          el.style.backgroundColor = "transparent";
+        }
+      }}
+    >
+      {({ isActive }) => (
+        <>
+          {/* Icon badge — small rounded square with tinted background */}
+          <div
+            className="flex items-center justify-center shrink-0"
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 6,
+              backgroundColor: isActive ? "var(--brand-accent-alpha-12)" : iconBg,
+            }}
+          >
+            <Icon
+              size={14}
+              style={{
+                color: isActive ? "var(--brand-accent)" : iconFg,
+              }}
+            />
+          </div>
+
+          {/* Label */}
+          <span className="flex-1">{label}</span>
+
+          {/* Optional count badge */}
+          {badge && (
+            <span
+              className="flex items-center justify-center"
+              style={{
+                minWidth: 20,
+                height: 20,
+                padding: "0 6px",
+                borderRadius: "var(--rounded-full)",
+                backgroundColor: isActive
+                  ? "var(--brand-accent)"
+                  : "var(--color-border)",
+                color: isActive ? "#FFFFFF" : "var(--sidebar-text-muted)",
+                fontSize: 11,
+                fontWeight: 600,
+                lineHeight: 1,
+              }}
+            >
+              {badge}
+            </span>
+          )}
+        </>
+      )}
+    </NavLink>
   );
 }
 
@@ -87,7 +237,7 @@ function LayoutInner() {
       <aside
         className="flex flex-col shrink-0"
         style={{
-          width: 240,
+          width: 260,
           backgroundColor: "var(--sidebar-bg)",
           color: "var(--sidebar-text)",
           fontFamily: "'IBM Plex Sans', sans-serif",
@@ -96,32 +246,33 @@ function LayoutInner() {
           left: 0,
           bottom: 0,
           zIndex: 30,
+          borderRight: "1px solid var(--color-border)",
         }}
       >
-        {/* Logo */}
+        {/* ── Company / Brand Header ──────────────────────────────────── */}
         <div
           className="flex items-center gap-3"
           style={{
-            padding: "var(--space-5) var(--space-5)",
-            borderBottom: "1px solid var(--sidebar-divider)",
+            padding: "16px 16px 12px",
           }}
         >
+          {/* Brand icon */}
           <div
             className="flex items-center justify-center shrink-0"
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: "var(--rounded-lg)",
-              backgroundColor: "var(--brand-green)",
-              fontSize: "var(--text-sm)",
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              backgroundColor: "var(--brand-accent)",
+              fontSize: 13,
               fontWeight: 700,
               color: "#fff",
-              letterSpacing: "0.5px",
+              letterSpacing: "0.3px",
             }}
           >
             FB
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <div
               style={{
                 fontSize: "var(--text-base)",
@@ -132,61 +283,165 @@ function LayoutInner() {
             >
               FlexiBenefits
             </div>
-            <div
+          </div>
+          {/* Expand chevron */}
+          <ChevronsUpDown
+            size={16}
+            style={{ color: "var(--sidebar-text-muted)", flexShrink: 0 }}
+          />
+        </div>
+
+        {/* ── Sidebar Search ──────────────────────────────────────────── */}
+        <div style={{ padding: "0 12px 8px" }}>
+          <div
+            className="flex items-center gap-2"
+            style={{
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: "1px solid var(--color-border)",
+              backgroundColor: "var(--sidebar-hover-bg)",
+            }}
+          >
+            <Search
+              size={14}
+              style={{ color: "var(--sidebar-text-muted)", flexShrink: 0 }}
+            />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               style={{
-                fontSize: "var(--text-xs)",
+                border: "none",
+                outline: "none",
+                background: "none",
+                fontSize: "var(--text-sm)",
+                color: "var(--sidebar-text)",
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                width: "100%",
+              }}
+            />
+            <kbd
+              style={{
+                fontSize: 10,
+                fontFamily: "'IBM Plex Sans', sans-serif",
                 color: "var(--sidebar-text-muted)",
-                lineHeight: 1.3,
+                backgroundColor: "var(--color-background)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 4,
+                padding: "1px 5px",
+                lineHeight: 1.4,
+                whiteSpace: "nowrap",
               }}
             >
-              HR Admin Portal
-            </div>
+              {"\u2318"}K
+            </kbd>
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto" style={{ padding: "var(--space-3) var(--space-3)" }}>
-          {NAV_ITEMS.map(({ path, label, icon: Icon }) => (
-            <NavLink
-              key={path}
-              to={path}
-              end={path === "/"}
-              className="flex items-center gap-3 transition-all duration-200"
-              style={({ isActive }) => ({
-                padding: "var(--space-2) var(--space-3)",
-                borderRadius: "var(--rounded-md)",
-                fontSize: "var(--text-sm)",
-                fontWeight: isActive ? 500 : 400,
-                color: isActive ? "var(--sidebar-text)" : "var(--sidebar-text-muted)",
-                backgroundColor: isActive ? "var(--sidebar-active-bg)" : "transparent",
-                textDecoration: "none",
-                marginBottom: 2,
-              })}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget;
-                if (!el.classList.contains("active")) {
-                  el.style.backgroundColor = "var(--sidebar-hover-bg)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget;
-                if (!el.classList.contains("active")) {
-                  el.style.backgroundColor = "transparent";
-                }
+        {/* ── Divider ─────────────────────────────────────────────────── */}
+        <div
+          style={{
+            height: 1,
+            backgroundColor: "var(--sidebar-divider)",
+            margin: "4px 16px 8px",
+          }}
+        />
+
+        {/* ── Main Navigation ─────────────────────────────────────────── */}
+        <nav
+          className="flex-1 overflow-y-auto"
+          style={{ padding: "0 12px" }}
+        >
+          {/* Section label */}
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 500,
+              color: "var(--sidebar-text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              padding: "8px 12px 6px",
+            }}
+          >
+            Main
+          </div>
+
+          {MAIN_NAV_ITEMS.map((item) => (
+            <SidebarNavItem key={item.path} {...item} />
+          ))}
+
+          {/* Settings section */}
+          <div
+            style={{
+              height: 1,
+              backgroundColor: "var(--sidebar-divider)",
+              margin: "12px 4px 8px",
+            }}
+          />
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 500,
+              color: "var(--sidebar-text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              padding: "4px 12px 6px",
+            }}
+          >
+            Settings
+          </div>
+
+          {BOTTOM_NAV_ITEMS.map((item) => (
+            <SidebarNavItem key={item.path} {...item} />
+          ))}
+
+          {/* Help center — static link style, not a route */}
+          <button
+            className="flex items-center gap-3 transition-colors duration-150"
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              fontSize: "var(--text-sm)",
+              fontWeight: 400,
+              color: "var(--sidebar-text-muted)",
+              backgroundColor: "transparent",
+              textDecoration: "none",
+              marginBottom: 2,
+              cursor: "pointer",
+              border: "none",
+              width: "100%",
+              textAlign: "left",
+              fontFamily: "'IBM Plex Sans', sans-serif",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = "transparent")
+            }
+          >
+            <div
+              className="flex items-center justify-center shrink-0"
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
+                backgroundColor: "var(--icon-help-bg)",
               }}
             >
-              <Icon size={18} />
-              {label}
-            </NavLink>
-          ))}
+              <HelpCircle size={14} style={{ color: "var(--icon-help-fg)" }} />
+            </div>
+            <span>Help center</span>
+          </button>
         </nav>
 
-        {/* Admin Profile Button */}
+        {/* ── Profile Footer ──────────────────────────────────────────── */}
         <button
           onClick={() => navigate("/settings")}
-          className="flex items-center gap-3 transition-all duration-200"
+          className="flex items-center gap-3 transition-colors duration-150"
           style={{
-            padding: "var(--space-4) var(--space-5)",
+            padding: "12px 16px",
             borderTop: "1px solid var(--sidebar-divider)",
             background: "none",
             border: "none",
@@ -196,6 +451,7 @@ function LayoutInner() {
             cursor: "pointer",
             textAlign: "left",
             width: "100%",
+            fontFamily: "'IBM Plex Sans', sans-serif",
           }}
           onMouseEnter={(e) =>
             (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
@@ -241,18 +497,18 @@ function LayoutInner() {
               {profile.designation}
             </div>
           </div>
-          <ChevronRight size={14} style={{ color: "var(--sidebar-text-muted)" }} />
+          <Settings size={15} style={{ color: "var(--sidebar-text-muted)", flexShrink: 0 }} />
         </button>
       </aside>
 
       {/* ─── Main Area ───────────────────────────────────────────────── */}
-      <div className="flex flex-col flex-1" style={{ marginLeft: 240 }}>
-        {/* Topbar */}
+      <div className="flex flex-col flex-1" style={{ marginLeft: 260 }}>
+        {/* ── Top Bar ─────────────────────────────────────────────────── */}
         <header
           className="flex items-center justify-between shrink-0"
           style={{
-            height: 60,
-            padding: "0 var(--space-6)",
+            height: 56,
+            padding: "0 24px",
             backgroundColor: "var(--color-background)",
             borderBottom: "1px solid var(--color-border)",
             position: "sticky",
@@ -260,85 +516,119 @@ function LayoutInner() {
             zIndex: 20,
           }}
         >
-          {/* Page Title */}
-          <h1
-            style={{
-              fontSize: "var(--text-lg)",
-              fontWeight: 600,
-              color: "var(--color-foreground)",
-              margin: 0,
-              fontFamily: "'IBM Plex Sans', sans-serif",
-            }}
-          >
-            {pageTitle}
-          </h1>
-
-          {/* Right Side */}
-          <div className="flex items-center gap-3">
-            {/* Search */}
-            <div
-              className="flex items-center gap-2"
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2">
+            <Home
+              size={14}
+              style={{ color: "var(--sidebar-text-muted)" }}
+            />
+            <span
               style={{
-                padding: "var(--space-1) var(--space-3)",
-                borderRadius: "var(--rounded-md)",
-                border: "1px solid var(--color-border)",
-                backgroundColor: "var(--color-background)",
-                width: 220,
+                fontSize: "var(--text-sm)",
+                color: "var(--sidebar-text-muted)",
               }}
             >
-              <Search size={15} style={{ color: "var(--color-muted-foreground)", flexShrink: 0 }} />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                style={{
-                  border: "none",
-                  outline: "none",
-                  background: "none",
-                  fontSize: "var(--text-sm)",
-                  color: "var(--color-foreground)",
-                  fontFamily: "'IBM Plex Sans', sans-serif",
-                  width: "100%",
-                }}
-              />
-            </div>
-
-            {/* Notification Bell */}
-            <button
-              onClick={() => setDrawerOpen(true)}
-              className="flex items-center justify-center transition-all duration-200"
+              FlexiBenefits
+            </span>
+            <ChevronRight
+              size={12}
+              style={{ color: "var(--color-border)" }}
+            />
+            <span
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: "var(--rounded-md)",
-                border: "none",
+                fontSize: "var(--text-sm)",
+                fontWeight: 500,
+                color: "var(--sidebar-text)",
+              }}
+            >
+              {pageTitle}
+            </span>
+          </div>
+
+          {/* Right Side Actions */}
+          <div className="flex items-center gap-2">
+            {/* Date range badge */}
+            <button
+              className="flex items-center gap-1.5 transition-colors duration-150"
+              style={{
+                padding: "5px 10px",
+                borderRadius: 8,
+                border: "1px solid var(--color-border)",
                 background: "none",
                 cursor: "pointer",
-                color: "var(--color-muted-foreground)",
-                position: "relative",
+                fontSize: "var(--text-sm)",
+                color: "var(--sidebar-text-muted)",
+                fontFamily: "'IBM Plex Sans', sans-serif",
               }}
               onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor =
-                  "var(--brand-navy-alpha-8)")
+                (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
               }
               onMouseLeave={(e) =>
                 (e.currentTarget.style.backgroundColor = "transparent")
               }
             >
-              <Bell size={20} />
+              <Calendar size={13} />
+              <span>Last 30 days</span>
+            </button>
+
+            {/* Filter button */}
+            <button
+              className="flex items-center gap-1.5 transition-colors duration-150"
+              style={{
+                padding: "5px 10px",
+                borderRadius: 8,
+                border: "1px solid var(--color-border)",
+                background: "none",
+                cursor: "pointer",
+                fontSize: "var(--text-sm)",
+                color: "var(--sidebar-text-muted)",
+                fontFamily: "'IBM Plex Sans', sans-serif",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "transparent")
+              }
+            >
+              <Filter size={13} />
+              <span>Filter</span>
+            </button>
+
+            {/* Notification Bell */}
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="flex items-center justify-center transition-colors duration-150"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                border: "1px solid var(--color-border)",
+                background: "none",
+                cursor: "pointer",
+                color: "var(--sidebar-text-muted)",
+                position: "relative",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "transparent")
+              }
+            >
+              <Bell size={16} />
               {unreadCount > 0 && (
                 <span
                   className="flex items-center justify-center"
                   style={{
                     position: "absolute",
-                    top: 4,
-                    right: 4,
+                    top: 3,
+                    right: 3,
                     minWidth: 16,
                     height: 16,
                     padding: "0 4px",
                     borderRadius: "var(--rounded-full)",
-                    backgroundColor: "var(--brand-red)",
+                    backgroundColor: "var(--brand-accent)",
                     color: "#fff",
                     fontSize: 10,
                     fontWeight: 600,
@@ -349,61 +639,16 @@ function LayoutInner() {
                 </span>
               )}
             </button>
-
-            {/* Profile Chip */}
-            <button
-              onClick={() => navigate("/settings")}
-              className="flex items-center gap-2 transition-all duration-200"
-              style={{
-                padding: "var(--space-1) var(--space-3) var(--space-1) var(--space-1)",
-                borderRadius: "var(--rounded-full)",
-                border: "1px solid var(--color-border)",
-                background: "none",
-                cursor: "pointer",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor =
-                  "var(--brand-navy-alpha-8)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
-            >
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "var(--rounded-full)",
-                  backgroundColor: profile.avatarColor,
-                  fontSize: "var(--text-xs)",
-                  fontWeight: 600,
-                  color: "#fff",
-                }}
-              >
-                {profile.initials}
-              </div>
-              <span
-                style={{
-                  fontSize: "var(--text-sm)",
-                  fontWeight: 500,
-                  color: "var(--color-foreground)",
-                  fontFamily: "'IBM Plex Sans', sans-serif",
-                }}
-              >
-                {profile.name.split(" ")[0]}
-              </span>
-            </button>
           </div>
         </header>
 
-        {/* Content */}
+        {/* ── Content Area ────────────────────────────────────────────── */}
         <main
           className="flex-1"
           style={{
             padding: "var(--space-6)",
-            backgroundColor: "var(--color-card)",
-            minHeight: "calc(100vh - 60px)",
+            backgroundColor: "var(--color-surface)",
+            minHeight: "calc(100vh - 56px)",
           }}
         >
           <Suspense fallback={<LoadingSpinner />}>
