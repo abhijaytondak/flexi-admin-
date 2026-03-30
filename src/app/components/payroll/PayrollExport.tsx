@@ -1,0 +1,286 @@
+import React, { useState, useCallback, type CSSProperties } from "react";
+import { Download, Calendar, DollarSign, Users, FileText, BarChart3 } from "lucide-react";
+import { formatINR, downloadFile } from "../../utils/helpers";
+import { StatCard } from "../shared/StatCard";
+
+const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
+
+const btnPrimary: CSSProperties = {
+  ...font, display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
+  padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-navy)",
+  color: "#fff", border: "none", borderRadius: "var(--rounded-md)",
+  fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer",
+};
+
+const inputStyle: CSSProperties = {
+  ...font, padding: "var(--space-2) var(--space-3)",
+  border: "1px solid var(--color-border)", borderRadius: "var(--rounded-md)",
+  fontSize: "var(--text-sm)", backgroundColor: "var(--color-background)",
+  color: "var(--color-foreground)", outline: "none",
+};
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const CATEGORIES = ["Food", "Fuel", "Comm", "LTA", "NPS"];
+
+interface MockRow {
+  employeeId: string;
+  name: string;
+  dept: string;
+  band: string;
+  food: number;
+  fuel: number;
+  comm: number;
+  lta: number;
+  nps: number;
+}
+
+const MOCK_DATA: MockRow[] = [
+  { employeeId: "EMP-001", name: "Priya Sharma", dept: "Engineering", band: "Premium", food: 4500, fuel: 3200, comm: 1500, lta: 0, nps: 6000 },
+  { employeeId: "EMP-002", name: "Rahul Verma", dept: "Engineering", band: "Executive", food: 6000, fuel: 5000, comm: 2000, lta: 12000, nps: 10000 },
+  { employeeId: "EMP-003", name: "Anita Desai", dept: "Product", band: "Premium", food: 4500, fuel: 0, comm: 1800, lta: 8000, nps: 5000 },
+  { employeeId: "EMP-004", name: "Vikram Patel", dept: "Sales", band: "Standard", food: 3000, fuel: 2500, comm: 1000, lta: 0, nps: 0 },
+  { employeeId: "EMP-005", name: "Deepa Nair", dept: "HR", band: "Premium", food: 4500, fuel: 3000, comm: 1500, lta: 5000, nps: 4000 },
+  { employeeId: "EMP-006", name: "Arjun Singh", dept: "Engineering", band: "Executive", food: 6000, fuel: 4500, comm: 2000, lta: 15000, nps: 12000 },
+  { employeeId: "EMP-007", name: "Meera Joshi", dept: "Marketing", band: "Standard", food: 3000, fuel: 0, comm: 800, lta: 0, nps: 0 },
+  { employeeId: "EMP-008", name: "Karthik Reddy", dept: "Engineering", band: "Premium", food: 4500, fuel: 3800, comm: 1500, lta: 0, nps: 7000 },
+  { employeeId: "EMP-009", name: "Sneha Gupta", dept: "Product", band: "Executive", food: 6000, fuel: 4000, comm: 2500, lta: 10000, nps: 8000 },
+  { employeeId: "EMP-010", name: "Ravi Kumar", dept: "Sales", band: "Standard", food: 3000, fuel: 2800, comm: 1000, lta: 0, nps: 0 },
+  { employeeId: "EMP-011", name: "Lakshmi Iyer", dept: "Finance", band: "Premium", food: 4500, fuel: 0, comm: 1200, lta: 6000, nps: 5500 },
+  { employeeId: "EMP-012", name: "Anil Kapoor", dept: "Operations", band: "Standard", food: 3000, fuel: 2000, comm: 900, lta: 0, nps: 0 },
+];
+
+function total(row: MockRow): number {
+  return row.food + row.fuel + row.comm + row.lta + row.nps;
+}
+
+function amountCell(val: number): string {
+  return val === 0 ? "\u2014" : formatINR(val);
+}
+
+export function PayrollExport() {
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
+  const [selectedYear] = useState(now.getFullYear());
+
+  const totalReimbursable = MOCK_DATA.reduce((s, r) => s + total(r), 0);
+  const employeesWithClaims = MOCK_DATA.filter(r => total(r) > 0).length;
+  const totalClaimsCount = MOCK_DATA.reduce((s, r) => {
+    let count = 0;
+    if (r.food > 0) count++;
+    if (r.fuel > 0) count++;
+    if (r.comm > 0) count++;
+    if (r.lta > 0) count++;
+    if (r.nps > 0) count++;
+    return s + count;
+  }, 0);
+  const avgPerEmployee = employeesWithClaims > 0 ? Math.round(totalReimbursable / employeesWithClaims) : 0;
+
+  // Column totals
+  const colTotals = {
+    food: MOCK_DATA.reduce((s, r) => s + r.food, 0),
+    fuel: MOCK_DATA.reduce((s, r) => s + r.fuel, 0),
+    comm: MOCK_DATA.reduce((s, r) => s + r.comm, 0),
+    lta: MOCK_DATA.reduce((s, r) => s + r.lta, 0),
+    nps: MOCK_DATA.reduce((s, r) => s + r.nps, 0),
+  };
+  const grandTotal = colTotals.food + colTotals.fuel + colTotals.comm + colTotals.lta + colTotals.nps;
+
+  const handleExport = useCallback(() => {
+    const headers = ["Employee ID", "Name", "Department", "Band", "Food", "Fuel", "Comm", "LTA", "NPS", "Total"];
+    const rows = MOCK_DATA.map(r =>
+      [r.employeeId, r.name, r.dept, r.band, r.food, r.fuel, r.comm, r.lta, r.nps, total(r)].join(",")
+    );
+    const totalsRow = ["", "TOTALS", "", "", colTotals.food, colTotals.fuel, colTotals.comm, colTotals.lta, colTotals.nps, grandTotal].join(",");
+    const csv = [headers.join(","), ...rows, totalsRow].join("\n");
+    downloadFile(csv, `payroll_${selectedMonth}_${selectedYear}.csv`);
+  }, [selectedMonth, selectedYear, colTotals, grandTotal]);
+
+  const thStyle: CSSProperties = {
+    textAlign: "left", padding: "var(--space-3) var(--space-3)",
+    fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)",
+    textTransform: "uppercase", letterSpacing: "0.04em",
+    borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-background)",
+    whiteSpace: "nowrap",
+  };
+
+  const tdStyle: CSSProperties = {
+    padding: "var(--space-3) var(--space-3)",
+    fontSize: "var(--text-sm)", color: "var(--color-foreground)",
+    borderBottom: "1px solid var(--color-border)",
+    whiteSpace: "nowrap",
+  };
+
+  const mutedTd: CSSProperties = {
+    ...tdStyle, color: "var(--color-muted-foreground)",
+  };
+
+  return (
+    <div style={{ ...font, padding: "var(--space-6)" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-5)" }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--color-foreground)" }}>
+            Payroll Export
+          </h1>
+          <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
+            Generate reimbursement data for payroll processing
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            <Calendar size={16} style={{ color: "var(--color-muted-foreground)" }} />
+            <select style={{ ...inputStyle, width: 140 }} value={selectedMonth}
+              onChange={e => setSelectedMonth(e.target.value)}>
+              {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
+              {selectedYear}
+            </span>
+          </div>
+          <button style={btnPrimary} onClick={handleExport}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-navy-hover)"}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-navy)"}>
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-4)", marginBottom: "var(--space-6)" }}>
+        <StatCard
+          title="Total Reimbursable"
+          value={formatINR(totalReimbursable)}
+          icon={DollarSign}
+          color="var(--brand-navy)"
+          bgColor="var(--brand-navy-alpha-08)"
+        />
+        <StatCard
+          title="Employees with Claims"
+          value={String(employeesWithClaims)}
+          icon={Users}
+          color="var(--brand-green)"
+          bgColor="var(--brand-green-light)"
+        />
+        <StatCard
+          title="Total Claims"
+          value={String(totalClaimsCount)}
+          icon={FileText}
+          color="#9B59B6"
+          bgColor="#F4ECF7"
+        />
+        <StatCard
+          title="Avg per Employee"
+          value={formatINR(avgPerEmployee)}
+          icon={BarChart3}
+          color="var(--brand-amber)"
+          bgColor="var(--brand-amber-light)"
+        />
+      </div>
+
+      {/* Data Table */}
+      <div style={{
+        backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)",
+        borderRadius: "var(--rounded-lg)", overflow: "hidden",
+      }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Employee ID</th>
+                <th style={thStyle}>Name</th>
+                <th style={thStyle}>Dept</th>
+                <th style={thStyle}>Band</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>Food</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>Fuel</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>Comm</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>LTA</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>NPS</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {MOCK_DATA.map((row, idx) => {
+                const rowTotal = total(row);
+                return (
+                  <tr key={row.employeeId}
+                    style={{ transition: "background-color 150ms" }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--color-background)"}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}>
+                    <td style={mutedTd}>{row.employeeId}</td>
+                    <td style={{ ...tdStyle, fontWeight: 500 }}>{row.name}</td>
+                    <td style={tdStyle}>{row.dept}</td>
+                    <td style={tdStyle}>
+                      <span style={{
+                        display: "inline-flex", padding: "1px 8px", borderRadius: "var(--rounded-full)",
+                        fontSize: "var(--text-xs)", fontWeight: 600,
+                        color: row.band === "Executive" ? "#3498DB" : row.band === "Premium" ? "#27AE60" : "#6B7A8D",
+                        backgroundColor: row.band === "Executive" ? "#EBF5FB" : row.band === "Premium" ? "#E8F8EF" : "#F0F2F5",
+                      }}>
+                        {row.band}
+                      </span>
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", color: row.food === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                      {amountCell(row.food)}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", color: row.fuel === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                      {amountCell(row.fuel)}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", color: row.comm === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                      {amountCell(row.comm)}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", color: row.lta === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                      {amountCell(row.lta)}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", color: row.nps === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                      {amountCell(row.nps)}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>
+                      {formatINR(rowTotal)}
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {/* Totals Row */}
+              <tr style={{ backgroundColor: "var(--color-background)" }}>
+                <td style={{ ...tdStyle, fontWeight: 700, borderBottom: "none" }} colSpan={4}>
+                  TOTALS
+                </td>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
+                  {formatINR(colTotals.food)}
+                </td>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
+                  {formatINR(colTotals.fuel)}
+                </td>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
+                  {formatINR(colTotals.comm)}
+                </td>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
+                  {formatINR(colTotals.lta)}
+                </td>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
+                  {formatINR(colTotals.nps)}
+                </td>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none", color: "var(--brand-navy)" }}>
+                  {formatINR(grandTotal)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Footer note */}
+      <p style={{
+        marginTop: "var(--space-4)", fontSize: "var(--text-xs)",
+        color: "var(--color-muted-foreground)", textAlign: "center",
+      }}>
+        Payroll data for {selectedMonth} {selectedYear}. Export as CSV for processing in your payroll system.
+      </p>
+    </div>
+  );
+}

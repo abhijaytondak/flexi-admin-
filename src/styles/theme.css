@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+:root {
+  /* ─── Typography ─────────────────────────────────────────────────── */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+  --text-3xl: 36px;
+
+  /* ─── Brand Colors ───────────────────────────────────────────────── */
+  --brand-navy: #1A2B3C;
+  --brand-navy-hover: #243A4F;
+  --brand-navy-dark: #152332;
+  --brand-navy-alpha-8: rgba(26, 43, 60, 0.08);
+  --brand-navy-alpha-12: rgba(26, 43, 60, 0.12);
+  --brand-navy-alpha-20: rgba(26, 43, 60, 0.20);
+
+  --brand-green: #27AE60;
+  --brand-green-dark: #1E8A4D;
+  --brand-green-light: #E8F8EF;
+  --brand-green-border: #B7E4CB;
+
+  --brand-blue: #3498DB;
+  --brand-blue-light: #EBF5FB;
+  --brand-blue-border: #A9D4EE;
+
+  --brand-amber: #F39C12;
+  --brand-amber-light: #FFF8E1;
+  --brand-amber-border: #F8D88A;
+
+  --brand-red: #E74C3C;
+  --brand-red-light: #FDECEB;
+  --brand-red-border: #F5BDB9;
+
+  --brand-purple: #9B59B6;
+  --brand-purple-light: #F3EAF8;
+
+  --brand-orange: #E67E22;
+  --brand-orange-light: #FEF3E7;
+
+  /* ─── Sidebar ────────────────────────────────────────────────────── */
+  --sidebar-bg: #1A2B3C;
+  --sidebar-text: #fff;
+  --sidebar-text-muted: #8B9DB5;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.12);
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.05);
+  --sidebar-divider: rgba(255, 255, 255, 0.10);
+
+  /* ─── Plan Colors ────────────────────────────────────────────────── */
+  --plan-standard-color: #6B7A8D;
+  --plan-standard-bg: #F0F2F5;
+  --plan-standard-border: #D8DDE4;
+
+  --plan-premium-color: #27AE60;
+  --plan-premium-bg: #E8F8EF;
+  --plan-premium-border: #B7E4CB;
+
+  --plan-executive-color: #3498DB;
+  --plan-executive-bg: #EBF5FB;
+  --plan-executive-border: #A9D4EE;
+
+  /* ─── Semantic Surface ───────────────────────────────────────────── */
+  --color-background: #FFFFFF;
+  --color-foreground: #161616;
+  --color-card: #F4F4F4;
+  --color-card-foreground: #161616;
+  --color-border: #E2E2E2;
+  --color-muted-foreground: #6F6F6F;
+  --color-destructive: #DA1E28;
+  --color-primary: #1A2B3C;
+  --color-primary-foreground: #FFFFFF;
+
+  /* ─── Elevation ──────────────────────────────────────────────────── */
+  --elevation-xs: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --elevation-sm: 0 2px 6px rgba(0, 0, 0, 0.08);
+  --elevation-md: 0 4px 16px rgba(0, 0, 0, 0.10);
+  --elevation-lg: 0 8px 32px rgba(26, 43, 60, 0.16);
+  --elevation-xl: 0 16px 48px rgba(26, 43, 60, 0.20);
+
+  /* ─── Radius ─────────────────────────────────────────────────────── */
+  --rounded-sm: 4px;
+  --rounded-md: 6px;
+  --rounded-lg: 10px;
+  --rounded-xl: 14px;
+  --rounded-full: 9999px;
+
+  /* ─── Spacing ────────────────────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: var(--text-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+}
