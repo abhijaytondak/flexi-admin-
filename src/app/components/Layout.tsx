@@ -282,46 +282,12 @@ function LayoutInner() {
           }}
         >
           {/* SalarySe logo */}
-          <div
-            className="flex items-center justify-center shrink-0"
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 6,
-              backgroundColor: "var(--brand-accent)",
-              position: "relative",
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L4 6v6c0 5.25 3.4 10.14 8 11.28C16.6 22.14 20 17.25 20 12V6l-8-4z" fill="#fff" fillOpacity="0.9"/>
-              <path d="M10 15l-3-3 1.4-1.4L10 12.2l5.6-5.6L17 8l-7 7z" fill="var(--brand-accent)"/>
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div style={{ lineHeight: 1.3 }}>
-              <span style={{
-                fontSize: "var(--text-base)",
-                fontWeight: 600,
-                color: "var(--sidebar-text)",
-              }}>
-                salary
-              </span>
-              <span style={{
-                fontSize: "var(--text-base)",
-                fontWeight: 700,
-                color: "var(--brand-accent)",
-              }}>
-                Se
-              </span>
-            </div>
-            <div style={{
-              fontSize: 11,
-              color: "var(--sidebar-text-muted)",
-              lineHeight: 1.2,
-              fontStyle: "italic",
-            }}>
-              flexi benefits
-            </div>
+          <div className="flex items-center shrink-0" style={{ height: 36 }}>
+            <img
+              src="/logo.svg"
+              alt="SalarySe"
+              style={{ height: 28, width: "auto" }}
+            />
           </div>
           {/* Close button on mobile, expand chevron on desktop */}
           {isMobile ? (
