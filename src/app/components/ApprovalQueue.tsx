@@ -218,19 +218,15 @@ export function ApprovalQueue() {
     return () => document.removeEventListener("keydown", handleEsc);
   }, [showRejectDialog, selectedClaim]);
 
-  // Approve action (single claim from drawer)
+  // Approve action (single claim from drawer) — local state only for demo
   const handleApprove = async () => {
     if (!selectedClaim) return;
     setActionLoading(true);
-    try {
-      await api.updateClaimStatus(selectedClaim.id, "approved", actionNote);
-      setClaims(prev => prev.map(c => c.id === selectedClaim.id ? { ...c, status: "approved" as ClaimStatus, actionNote, actionTimestamp: new Date().toISOString() } : c));
-      toast.success("Claim approved successfully");
-      setSelectedClaim(null); setActionNote("");
-    } catch (e: any) {
-      toast.error(e.message || "Action failed");
-    }
-    finally { setActionLoading(false); }
+    await new Promise(r => setTimeout(r, 600)); // simulate network
+    setClaims(prev => prev.map(c => c.id === selectedClaim.id ? { ...c, status: "approved" as ClaimStatus, actionNote: actionNote || "Approved by Admin", actionTimestamp: new Date().toISOString(), actionBy: "Amanda Johnson" } : c));
+    toast.success("Claim approved successfully");
+    setSelectedClaim(null); setActionNote("");
+    setActionLoading(false);
   };
 
   // Reject action: open rejection dialog
@@ -240,24 +236,20 @@ export function ApprovalQueue() {
     setShowRejectDialog(true);
   };
 
-  // Confirm rejection with reason
+  // Confirm rejection with reason — local state only for demo
   const confirmReject = async () => {
     if (!selectedClaim) return;
     if (rejectReason.trim().length < 10) return;
     setRejectLoading(true);
-    try {
-      const fullNote = `${rejectReason}${returnToLimit ? " [Amount returned to employee limit]" : ""}${actionNote ? `\n\nAdditional notes: ${actionNote}` : ""}`;
-      await api.updateClaimStatus(selectedClaim.id, "rejected", fullNote);
-      setClaims(prev => prev.map(c => c.id === selectedClaim.id ? { ...c, status: "rejected" as ClaimStatus, actionNote: fullNote, actionTimestamp: new Date().toISOString() } : c));
-      toast.success("Claim rejected");
-      setShowRejectDialog(false);
-      setRejectReason("");
-      setReturnToLimit(true);
-      setSelectedClaim(null); setActionNote("");
-    } catch (e: any) {
-      toast.error(e.message || "Action failed");
-    }
-    finally { setRejectLoading(false); }
+    await new Promise(r => setTimeout(r, 600));
+    const fullNote = `${rejectReason}${returnToLimit ? " [Amount returned to employee limit]" : ""}${actionNote ? `\n\nAdditional notes: ${actionNote}` : ""}`;
+    setClaims(prev => prev.map(c => c.id === selectedClaim.id ? { ...c, status: "rejected" as ClaimStatus, actionNote: fullNote, actionTimestamp: new Date().toISOString(), actionBy: "Amanda Johnson" } : c));
+    toast.success("Claim rejected");
+    setShowRejectDialog(false);
+    setRejectReason("");
+    setReturnToLimit(true);
+    setSelectedClaim(null); setActionNote("");
+    setRejectLoading(false);
   };
 
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -316,15 +308,11 @@ export function ApprovalQueue() {
     }
     setBulkLoading(true);
     const toastId = toast.loading(`Approving ${actionable.length} claims...`);
-    try {
-      await Promise.all(actionable.map(id => api.updateClaimStatus(id, "approved", "Bulk approved")));
-      setClaims(prev => prev.map(c => actionable.includes(c.id) ? { ...c, status: "approved" as ClaimStatus, actionNote: "Bulk approved", actionTimestamp: new Date().toISOString() } : c));
-      toast.success(`${actionable.length} claims approved`, { id: toastId });
-      setSelectedIds(new Set());
-    } catch (e: any) {
-      toast.error(e.message || "Action failed", { id: toastId });
-    }
-    finally { setBulkLoading(false); }
+    await new Promise(r => setTimeout(r, 800));
+    setClaims(prev => prev.map(c => actionable.includes(c.id) ? { ...c, status: "approved" as ClaimStatus, actionNote: "Bulk approved by Admin", actionTimestamp: new Date().toISOString(), actionBy: "Amanda Johnson" } : c));
+    toast.success(`${actionable.length} claims approved`, { id: toastId });
+    setSelectedIds(new Set());
+    setBulkLoading(false);
   };
 
   const openBulkRejectDialog = () => {
@@ -353,17 +341,13 @@ export function ApprovalQueue() {
     setBulkLoading(true);
     const fullNote = `${bulkRejectReason}${bulkReturnToLimit ? " [Amount returned to employee limit]" : ""}`;
     const toastId = toast.loading(`Rejecting ${actionable.length} claims...`);
-    try {
-      await Promise.all(actionable.map(id => api.updateClaimStatus(id, "rejected", fullNote)));
-      setClaims(prev => prev.map(c => actionable.includes(c.id) ? { ...c, status: "rejected" as ClaimStatus, actionNote: fullNote, actionTimestamp: new Date().toISOString() } : c));
-      toast.success(`${actionable.length} claims rejected`, { id: toastId });
-      setSelectedIds(new Set());
-      setShowBulkRejectDialog(false);
-      setBulkRejectReason("");
-    } catch (e: any) {
-      toast.error(e.message || "Action failed", { id: toastId });
-    }
-    finally { setBulkLoading(false); }
+    await new Promise(r => setTimeout(r, 800));
+    setClaims(prev => prev.map(c => actionable.includes(c.id) ? { ...c, status: "rejected" as ClaimStatus, actionNote: fullNote, actionTimestamp: new Date().toISOString(), actionBy: "Amanda Johnson" } : c));
+    toast.success(`${actionable.length} claims rejected`, { id: toastId });
+    setSelectedIds(new Set());
+    setShowBulkRejectDialog(false);
+    setBulkRejectReason("");
+    setBulkLoading(false);
   };
 
   // Filter logic
@@ -763,17 +747,65 @@ export function ApprovalQueue() {
                 ))}
               </div>
 
-              {/* Attachment indicator */}
+              {/* Attached Documents */}
               {selectedClaim.hasAttachment && (
-                <div style={{
-                  display: "flex", alignItems: "center", gap: "var(--space-2)",
-                  padding: "var(--space-3)", backgroundColor: "var(--color-background)",
-                  borderRadius: "var(--rounded-md)", marginBottom: "var(--space-5)",
-                }}>
-                  <Paperclip size={16} style={{ color: "var(--brand-navy)" }} />
-                  <span style={{ fontSize: "var(--text-sm)", color: "var(--brand-navy)", fontWeight: 500 }}>
-                    Attachment available
-                  </span>
+                <div style={{ marginBottom: "var(--space-5)" }}>
+                  <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    Attached Documents
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+                    {/* Dummy receipt image */}
+                    <div style={{
+                      border: "1px solid var(--color-border)", borderRadius: "var(--rounded-md)",
+                      overflow: "hidden", backgroundColor: "var(--color-background)",
+                    }}>
+                      <div style={{
+                        height: 120, background: "linear-gradient(135deg, #f8f8f8 0%, #e8e8e8 100%)",
+                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                        gap: 6, color: "var(--color-muted-foreground)",
+                      }}>
+                        <FileText size={28} style={{ opacity: 0.5 }} />
+                        <span style={{ fontSize: 10, fontWeight: 500 }}>Receipt</span>
+                      </div>
+                      <div style={{ padding: "var(--space-2) var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+                        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>
+                          {selectedClaim.merchantName || "Receipt"}_bill.pdf
+                        </p>
+                        <p style={{ margin: "2px 0 0", fontSize: 10, color: "var(--color-muted-foreground)" }}>
+                          PDF · 245 KB · {selectedClaim.dateSubmitted}
+                        </p>
+                      </div>
+                    </div>
+                    {/* UPI transaction proof */}
+                    <div style={{
+                      border: "1px solid var(--color-border)", borderRadius: "var(--rounded-md)",
+                      overflow: "hidden", backgroundColor: "var(--color-background)",
+                    }}>
+                      <div style={{
+                        height: 120, background: "linear-gradient(135deg, #f0f0ff 0%, #e0e0f8 100%)",
+                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                        gap: 6, padding: "var(--space-3)",
+                      }}>
+                        <div style={{
+                          width: 36, height: 36, borderRadius: "var(--rounded-full)",
+                          backgroundColor: "var(--brand-green)", display: "flex",
+                          alignItems: "center", justifyContent: "center",
+                        }}>
+                          <Check size={18} style={{ color: "#fff" }} />
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: "var(--brand-green)" }}>Payment Verified</span>
+                        <span style={{ fontSize: 9, color: "var(--color-muted-foreground)" }}>{selectedClaim.transactionId}</span>
+                      </div>
+                      <div style={{ padding: "var(--space-2) var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+                        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>
+                          UPI_transaction_proof.png
+                        </p>
+                        <p style={{ margin: "2px 0 0", fontSize: 10, color: "var(--color-muted-foreground)" }}>
+                          PNG · 128 KB · via SalarySe UPI
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
