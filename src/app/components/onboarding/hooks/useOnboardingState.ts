@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import type { BenefitPlan, Allowance } from "../../../types";
+import type { BenefitPlan } from "../../../types";
 
 // ─── Step Definitions ────────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import { createBrowserRouter } from "react-router";
-import React, { lazy } from "react";
+import { lazy } from "react";
 import { Layout } from "./components/Layout";
 import { NotFound } from "./components/NotFound";
 

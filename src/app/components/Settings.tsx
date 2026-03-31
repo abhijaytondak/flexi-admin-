@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
-  User, Palette, Bell, GitBranch, Shield, Database, Save, Check,
-  AlertCircle, ToggleLeft, ToggleRight, Loader2
+  User, Palette, Bell, GitBranch, Shield, Database, Save,
+ToggleLeft, ToggleRight, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import * as api from "../utils/api";
 import { useUserProfile, AVATAR_COLORS } from "../contexts/UserProfileContext";
 import { getInitials } from "../utils/helpers";
-import { BENEFIT_PLANS, DEFAULT_PROFILE, type AdminProfile, type DashboardCards } from "../types";
+import { type DashboardCards } from "../types";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
@@ -16,13 +16,6 @@ const btnPrimary: CSSProperties = {
   padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-accent)",
   color: "#fff", border: "none", borderRadius: "var(--rounded-md)",
   fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer",
-};
-
-const btnGhost: CSSProperties = {
-  ...font, display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
-  padding: "var(--space-2) var(--space-3)", backgroundColor: "transparent",
-  color: "var(--color-muted-foreground)", border: "1px solid var(--color-border)",
-  borderRadius: "var(--rounded-md)", fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer",
 };
 
 const inputStyle: CSSProperties = {

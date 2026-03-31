@@ -1,8 +1,7 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Search } from "lucide-react";
 import { toast } from "sonner";
 import * as api from "../../utils/api";
-import { parseINR, deriveBenefitPlan, deriveBracketLabel, formatINR } from "../../utils/helpers";
 import { PLAN_META, BENEFIT_PLANS, type Employee, type BenefitPlan } from "../../types";
 
 interface Props {

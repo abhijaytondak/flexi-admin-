@@ -88,11 +88,6 @@ export function OnboardingWizard() {
 
   const progressPercent = ((currentIndex + 1) / STEPS.length) * 100;
 
-  const currentErrors = useMemo(
-    () => getStepValidationErrors(currentStep, state.stepData),
-    [currentStep, state.stepData]
-  );
-
   const handleNext = () => {
     const errors = getStepValidationErrors(currentStep, state.stepData);
     if (errors.length > 0) {

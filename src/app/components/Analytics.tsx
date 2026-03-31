@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, type CSSProperties } from "react";
+import { useState, useEffect, useCallback, type CSSProperties } from "react";
 import {
-  BarChart3, TrendingUp, DollarSign, Users, AlertCircle, Percent
+  BarChart3, TrendingUp, DollarSign, AlertCircle, Percent
 } from "lucide-react";
 import * as api from "../utils/api";
 import { formatINR, parseINR } from "../utils/helpers";
@@ -34,7 +34,7 @@ function textForIntensity(pct: number): string {
 export function Analytics() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
-  const [brackets, setBrackets] = useState<SalaryBand[]>([]);
+  const [_brackets, setBrackets] = useState<SalaryBand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [setupRequired, setSetupRequired] = useState(false);

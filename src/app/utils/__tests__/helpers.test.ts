@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveBenefitPlan, deriveBracketLabel, formatINR, parseINR, getInitials } from '../helpers'
+import { deriveBenefitPlan, formatINR, parseINR, getInitials } from '../helpers'
 
 describe('deriveBenefitPlan', () => {
   it('returns Executive for CTC >= 10L', () => { expect(deriveBenefitPlan(1_000_000)).toBe('Executive') })

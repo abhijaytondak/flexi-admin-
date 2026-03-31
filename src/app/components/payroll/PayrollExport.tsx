@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, type CSSProperties } from "react";
+import { useState, useCallback, useMemo, type CSSProperties } from "react";
 import { Download, Calendar, DollarSign, Users, FileText, BarChart3, X } from "lucide-react";
 import { formatINR, downloadFile } from "../../utils/helpers";
 import { StatCard } from "../shared/StatCard";
@@ -25,7 +25,6 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-const CATEGORIES = ["Food", "Fuel", "Comm", "LTA", "NPS"];
 
 interface MockRow {
   employeeId: string;

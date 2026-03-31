@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
-  Plus, Upload, X, Users, AlertCircle, ChevronRight, Briefcase,
+  Plus, Upload, X, Users, AlertCircle,
   Mail, Phone, MapPin, Calendar, Trash2, Pencil, Save, Loader2, Check
 } from "lucide-react";
 import { toast } from "sonner";

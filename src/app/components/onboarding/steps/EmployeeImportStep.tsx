@@ -15,7 +15,6 @@ interface Props {
   onChange: (d: Partial<EmployeeImportData>) => void;
 }
 
-const EXPECTED_COLUMNS = ["name", "email", "department", "designation", "annualctc"];
 
 function detectColumn(header: string): string | null {
   const h = header.toLowerCase().replace(/[^a-z]/g, "");

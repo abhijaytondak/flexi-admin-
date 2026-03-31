@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
-  Check, X, ChevronRight, Paperclip, Filter, Upload, AlertCircle,
-  Clock, CheckCircle, XCircle, FileText, Search, ChevronDown, Loader2
+  Check, X, Paperclip, Filter, Upload, AlertCircle,
+  Clock, CheckCircle, XCircle, FileText, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import * as api from "../utils/api";
-import { formatINR, parseINR } from "../utils/helpers";
+import { parseINR } from "../utils/helpers";
 import { useSearch } from "../contexts/SearchContext";
-import { PLAN_META, type Claim, type ClaimStatus, type BenefitPlan } from "../types";
+import { type Claim, type ClaimStatus } from "../types";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 

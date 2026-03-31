@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+
 
 export interface GoalData {
   label: string;
@@ -27,7 +27,6 @@ function ProgressRing({ goal }: { goal: GoalData }) {
   const circumference = 2 * Math.PI * radius;
 
   // Determine if higher is better based on unit context
-  const higherIsBetter = goal.unit === "%" || goal.unit === "rate";
   const lowerIsBetter = goal.unit === "min" || goal.unit === "days";
 
   let pct: number;

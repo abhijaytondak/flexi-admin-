@@ -45,7 +45,6 @@ export function useFiscalYear(
       fyStartYear = now.getFullYear() - 1;
     }
 
-    const fyStart = new Date(fyStartYear, startMonthIdx, 1);
     const fyEnd = new Date(fyStartYear + 1, startMonthIdx, 0, 23, 59, 59);
 
     const currentFY =

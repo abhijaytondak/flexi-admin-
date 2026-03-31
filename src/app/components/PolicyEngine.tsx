@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
   ChevronDown, ChevronRight, Plus, Trash2, Upload, Shield, Settings2,
-  ToggleLeft, ToggleRight, FileText, AlertCircle, X, Package, Loader2, Save
+  ToggleLeft, ToggleRight, AlertCircle, X, Loader2, Save
 } from "lucide-react";
 import { toast } from "sonner";
 import * as api from "../utils/api";
-import { formatINR, parseINR } from "../utils/helpers";
+import { parseINR } from "../utils/helpers";
 import { useSearch } from "../contexts/SearchContext";
-import { PLAN_META, type SalaryBand, type Allowance, type BenefitPlan } from "../types";
+import { PLAN_META, type SalaryBand, type BenefitPlan } from "../types";
 
 /* ─── Styles ─────────────────────────────────────────────────────────────────── */
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
