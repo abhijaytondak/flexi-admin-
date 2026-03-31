@@ -6,15 +6,19 @@ import { toast } from "sonner";
 import type { CarryForwardRule, AllowanceCategory } from "../../types";
 
 const CATEGORIES: { key: AllowanceCategory; label: string }[] = [
-  { key: "food", label: "Food & Meals" },
-  { key: "fuel", label: "Fuel & Travel" },
-  { key: "communication", label: "Communication" },
-  { key: "lta", label: "Leave Travel Allowance" },
-  { key: "hra", label: "House Rent Allowance" },
-  { key: "nps", label: "NPS Contribution" },
-  { key: "professional_pursuit", label: "Professional Pursuit" },
-  { key: "gadget", label: "Gadgets & Equipment" },
-  { key: "other", label: "Other Allowances" },
+  { key: "food", label: "Food Allowance" },
+  { key: "children_education", label: "Children's Education" },
+  { key: "hostel", label: "Hostel Expenditure" },
+  { key: "books_periodicals", label: "Books & Periodicals" },
+  { key: "professional_development", label: "Professional Development" },
+  { key: "phone_internet", label: "Phone / Internet" },
+  { key: "health_fitness", label: "Health & Fitness" },
+  { key: "uniform", label: "Uniform Allowance" },
+  { key: "gift", label: "Gift Allowance" },
+  { key: "business_travel", label: "Business Travel" },
+  { key: "fuel", label: "Fuel Allowance" },
+  { key: "vehicle_maintenance", label: "Vehicle Maintenance" },
+  { key: "drivers_salary", label: "Driver's Salary" },
 ];
 
 const ACTION_LABELS: Record<CarryForwardRule["action"], string> = {
