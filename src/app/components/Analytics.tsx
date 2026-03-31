@@ -5,6 +5,7 @@ import {
 import * as api from "../utils/api";
 import { formatINR, parseINR } from "../utils/helpers";
 import { StatCard } from "./shared/StatCard";
+import { useSearch } from "../contexts/SearchContext";
 import { PLAN_META, BENEFIT_PLANS, type BenefitPlan, type Claim, type Employee, type SalaryBand } from "../types";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
@@ -32,6 +33,7 @@ function textForIntensity(pct: number): string {
 }
 
 export function Analytics() {
+  const { query } = useSearch();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [_brackets, setBrackets] = useState<SalaryBand[]>([]);
@@ -78,7 +80,13 @@ export function Analytics() {
   const avgClaimValue = approvedClaims.length > 0 ? Math.round(totalRealized / approvedClaims.length) : 0;
 
   // Department x Category heatmap
-  const departments = Array.from(new Set(filteredEmployees.map(e => e.department).filter(Boolean)));
+  const allDepartments = Array.from(new Set(filteredEmployees.map(e => e.department).filter(Boolean)));
+  const departments = query.trim()
+    ? allDepartments.filter(dept => {
+        const q = query.toLowerCase();
+        return dept.toLowerCase().includes(q) || CATEGORIES.some(cat => cat.toLowerCase().includes(q));
+      })
+    : allDepartments;
   const heatmapData: Record<string, Record<string, number>> = {};
   departments.forEach(dept => {
     heatmapData[dept] = {};

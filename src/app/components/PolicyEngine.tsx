@@ -211,11 +211,14 @@ export function PolicyEngine() {
     finally { setSaving(false); if (fileRef.current) fileRef.current.value = ""; }
   };
 
-  const filtered = brackets.filter(b =>
-    !query || b.name.toLowerCase().includes(query.toLowerCase()) ||
-    b.benefitPlan.toLowerCase().includes(query.toLowerCase()) ||
-    b.range.toLowerCase().includes(query.toLowerCase())
-  );
+  const filtered = brackets.filter(b => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return b.range?.toLowerCase().includes(q) ||
+      b.benefitPlan?.toLowerCase().includes(q) ||
+      b.name?.toLowerCase().includes(q) ||
+      b.benefits?.some(ben => ben.name?.toLowerCase().includes(q));
+  });
 
   /* ─── Day-0 Empty State ────────────────────────────────────────────────────── */
   if (!loading && setupRequired && brackets.length === 0) {

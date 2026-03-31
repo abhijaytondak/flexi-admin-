@@ -340,7 +340,8 @@ export function EmployeeDirectory() {
     const q = query.toLowerCase();
     filtered = filtered.filter(e =>
       e.name.toLowerCase().includes(q) || e.department?.toLowerCase().includes(q) ||
-      e.designation?.toLowerCase().includes(q) || e.email?.toLowerCase().includes(q)
+      e.designation?.toLowerCase().includes(q) || e.email?.toLowerCase().includes(q) ||
+      e.id?.toLowerCase().includes(q) || e.benefitPlan?.toLowerCase().includes(q)
     );
   }
 

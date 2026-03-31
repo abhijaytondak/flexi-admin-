@@ -91,6 +91,7 @@ function getPageTitle(pathname: string): string {
   if (item) return item.label;
   if (pathname === "/onboarding") return "Onboarding";
   if (pathname === "/fiscal") return "Fiscal Settings";
+  if (pathname === "/help") return "Help Center";
   return "SalarySe";
 }
 
@@ -421,44 +422,14 @@ function LayoutInner() {
             <SidebarNavItem key={item.path} {...item} />
           ))}
 
-          {/* Help center — static link style, not a route */}
-          <button
-            className="flex items-center gap-3 transition-colors duration-150"
-            style={{
-              padding: "8px 12px",
-              borderRadius: 8,
-              fontSize: "var(--text-sm)",
-              fontWeight: 400,
-              color: "var(--sidebar-text-muted)",
-              backgroundColor: "transparent",
-              textDecoration: "none",
-              marginBottom: 2,
-              cursor: "pointer",
-              border: "none",
-              width: "100%",
-              textAlign: "left",
-              fontFamily: "'IBM Plex Sans', sans-serif",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            <div
-              className="flex items-center justify-center shrink-0"
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 6,
-                backgroundColor: "var(--icon-help-bg)",
-              }}
-            >
-              <HelpCircle size={14} style={{ color: "var(--icon-help-fg)" }} />
-            </div>
-            <span>Help center</span>
-          </button>
+          {/* Help center — linked to /help route */}
+          <SidebarNavItem
+            path="/help"
+            label="Help center"
+            icon={HelpCircle}
+            iconBg="var(--icon-help-bg)"
+            iconFg="var(--icon-help-fg)"
+          />
         </nav>
 
         {/* ── Profile Footer ──────────────────────────────────────────── */}

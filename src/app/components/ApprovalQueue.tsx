@@ -364,7 +364,9 @@ export function ApprovalQueue() {
       c.id.toLowerCase().includes(q) ||
       c.department?.toLowerCase().includes(q) ||
       c.benefitType?.toLowerCase().includes(q) ||
-      c.category?.toLowerCase().includes(q)
+      c.category?.toLowerCase().includes(q) ||
+      c.claimAmount?.toString().toLowerCase().includes(q) ||
+      c.status?.toLowerCase().includes(q)
     );
   }
 
