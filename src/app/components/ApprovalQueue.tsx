@@ -304,13 +304,16 @@ export function ApprovalQueue() {
 
   const clearSelection = () => setSelectedIds(new Set());
 
-  const bulkApprove = async (filteredClaims: Claim[]) => {
+  const bulkApprove = async () => {
     const ids = Array.from(selectedIds);
     const actionable = ids.filter(id => {
-      const c = filteredClaims.find(cl => cl.id === id);
-      return c && (c.status === "pending" || c.status === "submitted" || c.status === "claimed");
+      const c = claims.find(cl => cl.id === id);
+      return c && (c.status === "pending" || c.status === "submitted" || c.status === "claimed" || c.status === "invoice_pending");
     });
-    if (actionable.length === 0) return;
+    if (actionable.length === 0) {
+      toast.error("No pending claims selected to approve");
+      return;
+    }
     setBulkLoading(true);
     const toastId = toast.loading(`Approving ${actionable.length} claims...`);
     try {
@@ -328,7 +331,7 @@ export function ApprovalQueue() {
     const ids = Array.from(selectedIds);
     const actionable = ids.filter(id => {
       const c = claims.find(cl => cl.id === id);
-      return c && (c.status === "pending" || c.status === "submitted" || c.status === "claimed");
+      return c && (c.status === "pending" || c.status === "submitted" || c.status === "claimed" || c.status === "invoice_pending");
     });
     if (actionable.length === 0) {
       toast.error("No pending claims selected");
@@ -344,7 +347,7 @@ export function ApprovalQueue() {
     const ids = Array.from(selectedIds);
     const actionable = ids.filter(id => {
       const c = claims.find(cl => cl.id === id);
-      return c && (c.status === "pending" || c.status === "submitted" || c.status === "claimed");
+      return c && (c.status === "pending" || c.status === "submitted" || c.status === "claimed" || c.status === "invoice_pending");
     });
     if (actionable.length === 0) return;
     setBulkLoading(true);
@@ -578,6 +581,7 @@ export function ApprovalQueue() {
             const isSelected = selectedIds.has(claim.id);
             return (
               <div key={claim.id || idx}
+                onClick={() => { setSelectedClaim(claim); setActionNote(""); }}
                 style={{
                   display: "grid", gridTemplateColumns: "40px 2fr 1.2fr 1fr 1fr 0.8fr 40px",
                   gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
@@ -601,7 +605,6 @@ export function ApprovalQueue() {
                 </span>
                 <div
                   style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}
-                  onClick={() => { setSelectedClaim(claim); setActionNote(""); }}
                 >
                   <div style={{
                     width: 36, height: 36, borderRadius: "var(--rounded-full)",
@@ -622,25 +625,21 @@ export function ApprovalQueue() {
                 </div>
                 <span
                   style={{ fontSize: "var(--text-sm)", color: "var(--color-foreground)", display: "flex", alignItems: "center" }}
-                  onClick={() => { setSelectedClaim(claim); setActionNote(""); }}
                 >
                   {claim.benefitType || claim.category}
                 </span>
                 <span
                   style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)", display: "flex", alignItems: "center" }}
-                  onClick={() => { setSelectedClaim(claim); setActionNote(""); }}
                 >
                   {claim.claimAmount}
                 </span>
                 <span
                   style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center" }}
-                  onClick={() => { setSelectedClaim(claim); setActionNote(""); }}
                 >
                   {claim.dateSubmitted}
                 </span>
                 <div
                   style={{ display: "flex", alignItems: "center" }}
-                  onClick={() => { setSelectedClaim(claim); setActionNote(""); }}
                 >
                   <span style={statusBadge(claim.status)}>
                     <StatusIcon size={12} />
@@ -649,7 +648,6 @@ export function ApprovalQueue() {
                 </div>
                 <div
                   style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
-                  onClick={() => { setSelectedClaim(claim); setActionNote(""); }}
                 >
                   {claim.hasAttachment && <Paperclip size={14} style={{ color: "var(--color-muted-foreground)" }} />}
                 </div>
@@ -674,7 +672,7 @@ export function ApprovalQueue() {
           <div style={{ width: 1, height: 24, backgroundColor: "var(--color-border)" }} />
           <button
             style={{ ...btnPrimary, backgroundColor: "var(--brand-green)", padding: "var(--space-2) var(--space-3)" }}
-            onClick={() => bulkApprove(filtered)}
+            onClick={bulkApprove}
             disabled={bulkLoading}
           >
             {bulkLoading ? <Spinner size={14} /> : <CheckCircle size={14} />} Approve All
@@ -824,7 +822,7 @@ export function ApprovalQueue() {
             </div>
 
             {/* Drawer Footer */}
-            {(selectedClaim.status === "pending" || selectedClaim.status === "submitted" || selectedClaim.status === "claimed") && (
+            {(selectedClaim.status === "pending" || selectedClaim.status === "submitted" || selectedClaim.status === "claimed" || selectedClaim.status === "invoice_pending") && (
               <div style={{
                 display: "flex", gap: "var(--space-3)", padding: "var(--space-4) var(--space-5)",
                 borderTop: "1px solid var(--color-border)",
