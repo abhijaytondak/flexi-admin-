@@ -115,14 +115,19 @@ export const DEFAULT_SALARY_COMPONENTS: SalaryComponent[] = [
 ];
 
 const makeBenefitRows = (multiplier: number): BenefitCategoryRow[] => [
-  { id: "food", name: "Food & Meals", enabled: true, monthlyLimit: Math.round(2500 * multiplier), billRequired: true, carryForward: false },
-  { id: "fuel", name: "Fuel & Travel", enabled: true, monthlyLimit: Math.round(3000 * multiplier), billRequired: true, carryForward: false },
-  { id: "communication", name: "Communication", enabled: true, monthlyLimit: Math.round(1500 * multiplier), billRequired: true, carryForward: true },
-  { id: "lta", name: "Leave Travel Allowance", enabled: true, monthlyLimit: Math.round(5000 * multiplier), billRequired: true, carryForward: true },
-  { id: "professional", name: "Professional Pursuit", enabled: multiplier > 1, monthlyLimit: Math.round(3000 * multiplier), billRequired: true, carryForward: false },
-  { id: "gadget", name: "Gadget & Equipment", enabled: multiplier > 1.2, monthlyLimit: Math.round(4000 * multiplier), billRequired: true, carryForward: true },
-  { id: "wellness", name: "Health & Wellness", enabled: true, monthlyLimit: Math.round(2000 * multiplier), billRequired: false, carryForward: false },
-  { id: "other", name: "Other Reimbursements", enabled: false, monthlyLimit: Math.round(1000 * multiplier), billRequired: true, carryForward: false },
+  { id: "food", name: "Food Allowance", enabled: true, monthlyLimit: Math.round(2500 * multiplier), billRequired: false, carryForward: false },
+  { id: "children_education", name: "Children's Education Allowance", enabled: true, monthlyLimit: Math.round(2000 * multiplier), billRequired: true, carryForward: true },
+  { id: "hostel", name: "Hostel Expenditure Allowance", enabled: false, monthlyLimit: Math.round(1500 * multiplier), billRequired: true, carryForward: true },
+  { id: "books", name: "Books and Periodicals", enabled: true, monthlyLimit: Math.round(1000 * multiplier), billRequired: true, carryForward: false },
+  { id: "professional", name: "Professional Development Allowance", enabled: multiplier > 1, monthlyLimit: Math.round(3000 * multiplier), billRequired: true, carryForward: false },
+  { id: "phone_internet", name: "Phone / Internet Allowance", enabled: true, monthlyLimit: Math.round(1500 * multiplier), billRequired: true, carryForward: true },
+  { id: "health_fitness", name: "Health and Fitness Allowance", enabled: true, monthlyLimit: Math.round(2000 * multiplier), billRequired: true, carryForward: false },
+  { id: "uniform", name: "Uniform Allowance", enabled: false, monthlyLimit: Math.round(1000 * multiplier), billRequired: true, carryForward: false },
+  { id: "gift", name: "Gift Allowance", enabled: false, monthlyLimit: Math.round(500 * multiplier), billRequired: false, carryForward: false },
+  { id: "business_travel", name: "Business Travel Allowance", enabled: true, monthlyLimit: Math.round(5000 * multiplier), billRequired: true, carryForward: true },
+  { id: "fuel", name: "Fuel Allowance", enabled: true, monthlyLimit: Math.round(3000 * multiplier), billRequired: true, carryForward: false },
+  { id: "vehicle_maintenance", name: "Vehicle Maintenance Allowance", enabled: false, monthlyLimit: Math.round(2000 * multiplier), billRequired: true, carryForward: true },
+  { id: "drivers_salary", name: "Driver's Salary", enabled: multiplier > 1.2, monthlyLimit: Math.round(4000 * multiplier), billRequired: true, carryForward: true },
 ];
 
 const DEFAULT_STEP_DATA: StepDataMap = {

@@ -34,23 +34,23 @@ interface MockRow {
   food: number;
   fuel: number;
   comm: number;
-  lta: number;
-  nps: number;
+  profPursuit: number;
+  gadget: number;
 }
 
 const BASE_EMPLOYEES: MockRow[] = [
-  { employeeId: "EMP-001", name: "Priya Sharma", dept: "Engineering", band: "Premium", food: 4500, fuel: 3200, comm: 1500, lta: 0, nps: 6000 },
-  { employeeId: "EMP-002", name: "Rahul Verma", dept: "Engineering", band: "Executive", food: 6000, fuel: 5000, comm: 2000, lta: 12000, nps: 10000 },
-  { employeeId: "EMP-003", name: "Anita Desai", dept: "Product", band: "Premium", food: 4500, fuel: 0, comm: 1800, lta: 8000, nps: 5000 },
-  { employeeId: "EMP-004", name: "Vikram Patel", dept: "Sales", band: "Standard", food: 3000, fuel: 2500, comm: 1000, lta: 0, nps: 0 },
-  { employeeId: "EMP-005", name: "Deepa Nair", dept: "HR", band: "Premium", food: 4500, fuel: 3000, comm: 1500, lta: 5000, nps: 4000 },
-  { employeeId: "EMP-006", name: "Arjun Singh", dept: "Engineering", band: "Executive", food: 6000, fuel: 4500, comm: 2000, lta: 15000, nps: 12000 },
-  { employeeId: "EMP-007", name: "Meera Joshi", dept: "Marketing", band: "Standard", food: 3000, fuel: 0, comm: 800, lta: 0, nps: 0 },
-  { employeeId: "EMP-008", name: "Karthik Reddy", dept: "Engineering", band: "Premium", food: 4500, fuel: 3800, comm: 1500, lta: 0, nps: 7000 },
-  { employeeId: "EMP-009", name: "Sneha Gupta", dept: "Product", band: "Executive", food: 6000, fuel: 4000, comm: 2500, lta: 10000, nps: 8000 },
-  { employeeId: "EMP-010", name: "Ravi Kumar", dept: "Sales", band: "Standard", food: 3000, fuel: 2800, comm: 1000, lta: 0, nps: 0 },
-  { employeeId: "EMP-011", name: "Lakshmi Iyer", dept: "Finance", band: "Premium", food: 4500, fuel: 0, comm: 1200, lta: 6000, nps: 5500 },
-  { employeeId: "EMP-012", name: "Anil Kapoor", dept: "Operations", band: "Standard", food: 3000, fuel: 2000, comm: 900, lta: 0, nps: 0 },
+  { employeeId: "EMP-001", name: "Priya Sharma", dept: "Engineering", band: "Premium", food: 4500, fuel: 3200, comm: 1500, profPursuit: 0, gadget: 6000 },
+  { employeeId: "EMP-002", name: "Rahul Verma", dept: "Engineering", band: "Executive", food: 6000, fuel: 5000, comm: 2000, profPursuit: 12000, gadget: 10000 },
+  { employeeId: "EMP-003", name: "Anita Desai", dept: "Product", band: "Premium", food: 4500, fuel: 0, comm: 1800, profPursuit: 8000, gadget: 5000 },
+  { employeeId: "EMP-004", name: "Vikram Patel", dept: "Sales", band: "Standard", food: 3000, fuel: 2500, comm: 1000, profPursuit: 0, gadget: 0 },
+  { employeeId: "EMP-005", name: "Deepa Nair", dept: "HR", band: "Premium", food: 4500, fuel: 3000, comm: 1500, profPursuit: 5000, gadget: 4000 },
+  { employeeId: "EMP-006", name: "Arjun Singh", dept: "Engineering", band: "Executive", food: 6000, fuel: 4500, comm: 2000, profPursuit: 15000, gadget: 12000 },
+  { employeeId: "EMP-007", name: "Meera Joshi", dept: "Marketing", band: "Standard", food: 3000, fuel: 0, comm: 800, profPursuit: 0, gadget: 0 },
+  { employeeId: "EMP-008", name: "Karthik Reddy", dept: "Engineering", band: "Premium", food: 4500, fuel: 3800, comm: 1500, profPursuit: 0, gadget: 7000 },
+  { employeeId: "EMP-009", name: "Sneha Gupta", dept: "Product", band: "Executive", food: 6000, fuel: 4000, comm: 2500, profPursuit: 10000, gadget: 8000 },
+  { employeeId: "EMP-010", name: "Ravi Kumar", dept: "Sales", band: "Standard", food: 3000, fuel: 2800, comm: 1000, profPursuit: 0, gadget: 0 },
+  { employeeId: "EMP-011", name: "Lakshmi Iyer", dept: "Finance", band: "Premium", food: 4500, fuel: 0, comm: 1200, profPursuit: 6000, gadget: 5500 },
+  { employeeId: "EMP-012", name: "Anil Kapoor", dept: "Operations", band: "Standard", food: 3000, fuel: 2000, comm: 900, profPursuit: 0, gadget: 0 },
 ];
 
 /** Generate deterministic mock data per month -- multiplier varies amounts by cycle */
@@ -68,13 +68,13 @@ function getDataForMonth(month: string): MockRow[] {
     food: Math.round(row.food * m),
     fuel: Math.round(row.fuel * m),
     comm: Math.round(row.comm * m),
-    lta: Math.round(row.lta * m),
-    nps: Math.round(row.nps * m),
+    profPursuit: Math.round(row.profPursuit * m),
+    gadget: Math.round(row.gadget * m),
   }));
 }
 
 function total(row: MockRow): number {
-  return row.food + row.fuel + row.comm + row.lta + row.nps;
+  return row.food + row.fuel + row.comm + row.profPursuit + row.gadget;
 }
 
 function amountCell(val: number): string {
@@ -97,8 +97,8 @@ export function PayrollExport() {
     if (r.food > 0) count++;
     if (r.fuel > 0) count++;
     if (r.comm > 0) count++;
-    if (r.lta > 0) count++;
-    if (r.nps > 0) count++;
+    if (r.profPursuit > 0) count++;
+    if (r.gadget > 0) count++;
     return s + count;
   }, 0);
   const avgPerEmployee = employeesWithClaims > 0 ? Math.round(totalReimbursable / employeesWithClaims) : 0;
@@ -108,10 +108,10 @@ export function PayrollExport() {
     food: filteredData.reduce((s, r) => s + r.food, 0),
     fuel: filteredData.reduce((s, r) => s + r.fuel, 0),
     comm: filteredData.reduce((s, r) => s + r.comm, 0),
-    lta: filteredData.reduce((s, r) => s + r.lta, 0),
-    nps: filteredData.reduce((s, r) => s + r.nps, 0),
+    profPursuit: filteredData.reduce((s, r) => s + r.profPursuit, 0),
+    gadget: filteredData.reduce((s, r) => s + r.gadget, 0),
   };
-  const grandTotal = colTotals.food + colTotals.fuel + colTotals.comm + colTotals.lta + colTotals.nps;
+  const grandTotal = colTotals.food + colTotals.fuel + colTotals.comm + colTotals.profPursuit + colTotals.gadget;
 
   const handleExport = useCallback(() => {
     try {
@@ -119,13 +119,13 @@ export function PayrollExport() {
         toast.error("Failed to generate report");
         return;
       }
-      const headers = ["Employee ID", "Name", "Department", "Band", "Food", "Fuel", "Communication", "LTA", "NPS", "Total Claims", "Total Amount"];
+      const headers = ["Employee ID", "Name", "Department", "Band", "Food", "Fuel", "Communication", "Education", "Health", "Total Claims", "Total Amount"];
       const rows = filteredData.map(r => {
-        const claimsCount = [r.food, r.fuel, r.comm, r.lta, r.nps].filter(v => v > 0).length;
-        return [r.employeeId, `"${r.name}"`, r.dept, r.band, r.food, r.fuel, r.comm, r.lta, r.nps, claimsCount, total(r)].join(",");
+        const claimsCount = [r.food, r.fuel, r.comm, r.profPursuit, r.gadget].filter(v => v > 0).length;
+        return [r.employeeId, `"${r.name}"`, r.dept, r.band, r.food, r.fuel, r.comm, r.profPursuit, r.gadget, claimsCount, total(r)].join(",");
       });
-      const totalClaimsSum = filteredData.reduce((s, r) => s + [r.food, r.fuel, r.comm, r.lta, r.nps].filter(v => v > 0).length, 0);
-      const totalsRow = ["", "TOTALS", "", "", colTotals.food, colTotals.fuel, colTotals.comm, colTotals.lta, colTotals.nps, totalClaimsSum, grandTotal].join(",");
+      const totalClaimsSum = filteredData.reduce((s, r) => s + [r.food, r.fuel, r.comm, r.profPursuit, r.gadget].filter(v => v > 0).length, 0);
+      const totalsRow = ["", "TOTALS", "", "", colTotals.food, colTotals.fuel, colTotals.comm, colTotals.profPursuit, colTotals.gadget, totalClaimsSum, grandTotal].join(",");
       const csv = [headers.join(","), ...rows, totalsRow].join("\n");
       downloadFile(csv, `payroll_${selectedMonth}_${selectedYear}.csv`);
       toast.success("Payroll report downloaded");
@@ -284,11 +284,11 @@ export function PayrollExport() {
                         <td style={{ ...tdStyle, textAlign: "right", color: row.comm === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
                           {amountCell(row.comm)}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: "right", color: row.lta === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
-                          {amountCell(row.lta)}
+                        <td style={{ ...tdStyle, textAlign: "right", color: row.profPursuit === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                          {amountCell(row.profPursuit)}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: "right", color: row.nps === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
-                          {amountCell(row.nps)}
+                        <td style={{ ...tdStyle, textAlign: "right", color: row.gadget === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                          {amountCell(row.gadget)}
                         </td>
                         <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>
                           {formatINR(rowTotal)}
@@ -312,10 +312,10 @@ export function PayrollExport() {
                       {formatINR(colTotals.comm)}
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
-                      {formatINR(colTotals.lta)}
+                      {formatINR(colTotals.profPursuit)}
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
-                      {formatINR(colTotals.nps)}
+                      {formatINR(colTotals.gadget)}
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none", color: "var(--brand-navy)" }}>
                       {formatINR(grandTotal)}
@@ -381,8 +381,8 @@ export function PayrollExport() {
                 { label: "Food & Meals", value: selectedRow.food },
                 { label: "Fuel & Travel", value: selectedRow.fuel },
                 { label: "Communication", value: selectedRow.comm },
-                { label: "Leave Travel Allowance", value: selectedRow.lta },
-                { label: "NPS Contribution", value: selectedRow.nps },
+                { label: "Leave Travel Allowance", value: selectedRow.profPursuit },
+                { label: "Health & Fitness", value: selectedRow.gadget },
               ].map(item => (
                 <div key={item.label} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",

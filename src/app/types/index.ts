@@ -50,7 +50,37 @@ export interface Claim {
 
 // ─── Policy ───────────────────────────────────────────────────────────────────
 
-export type AllowanceCategory = "food" | "fuel" | "communication" | "lta" | "hra" | "nps" | "professional_pursuit" | "gadget" | "other";
+export type AllowanceCategory =
+  | "food"
+  | "children_education"
+  | "hostel"
+  | "books_periodicals"
+  | "professional_development"
+  | "phone_internet"
+  | "health_fitness"
+  | "uniform"
+  | "gift"
+  | "business_travel"
+  | "fuel"
+  | "vehicle_maintenance"
+  | "drivers_salary"
+  | "other";
+
+export const FLEXI_BENEFIT_CATEGORIES: { key: AllowanceCategory; label: string; defaultBillRequired: boolean }[] = [
+  { key: "food", label: "Food Allowance", defaultBillRequired: false },
+  { key: "children_education", label: "Children's Education Allowance", defaultBillRequired: true },
+  { key: "hostel", label: "Hostel Expenditure Allowance", defaultBillRequired: true },
+  { key: "books_periodicals", label: "Books and Periodicals", defaultBillRequired: true },
+  { key: "professional_development", label: "Professional Development Allowance", defaultBillRequired: true },
+  { key: "phone_internet", label: "Phone / Internet Allowance", defaultBillRequired: true },
+  { key: "health_fitness", label: "Health and Fitness Allowance", defaultBillRequired: true },
+  { key: "uniform", label: "Uniform Allowance", defaultBillRequired: true },
+  { key: "gift", label: "Gift Allowance", defaultBillRequired: false },
+  { key: "business_travel", label: "Business Travel Allowance", defaultBillRequired: true },
+  { key: "fuel", label: "Fuel Allowance", defaultBillRequired: true },
+  { key: "vehicle_maintenance", label: "Vehicle Maintenance Allowance", defaultBillRequired: true },
+  { key: "drivers_salary", label: "Driver's Salary", defaultBillRequired: true },
+];
 
 export interface Allowance {
   name: string;

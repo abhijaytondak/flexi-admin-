@@ -17,7 +17,7 @@ const btnGhost: CSSProperties = {
   borderRadius: "var(--rounded-md)", fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer",
 };
 
-const CATEGORIES = ["Food", "Fuel", "Communication", "LTA", "HRA", "NPS", "Professional Pursuit", "Gadget", "Other"];
+const CATEGORIES = ["Food", "Fuel", "Phone/Internet", "Education", "Health", "Travel", "Other"];
 
 function colorIntensity(pct: number): string {
   if (pct === 0) return "var(--color-background)";

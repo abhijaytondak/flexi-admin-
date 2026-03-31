@@ -33,7 +33,7 @@ const inputStyle: CSSProperties = {
 };
 
 const STATUS_FILTERS = ["All", "Pending", "Approved", "Rejected"] as const;
-const CATEGORIES = ["All", "LTA", "HRA", "Fuel", "Meal", "Internet", "NPS"] as const;
+const CATEGORIES = ["All", "Food", "Fuel", "Phone/Internet", "Education", "Health", "Travel", "Other"] as const;
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: any }> = {
   pending: { color: "var(--brand-amber)", bg: "var(--brand-amber-light)", icon: Clock },
