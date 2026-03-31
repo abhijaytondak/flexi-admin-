@@ -11,12 +11,12 @@
   --text-3xl: 36px;
 
   /* ─── Brand Colors ───────────────────────────────────────────────── */
-  --brand-accent: #E8683A;
-  --brand-accent-hover: #D55A2E;
-  --brand-accent-light: #FDF0EB;
-  --brand-accent-alpha-8: rgba(232, 104, 58, 0.08);
-  --brand-accent-alpha-12: rgba(232, 104, 58, 0.12);
-  --brand-accent-alpha-20: rgba(232, 104, 58, 0.20);
+  --brand-accent: #3B3FE4;
+  --brand-accent-hover: #2F33C8;
+  --brand-accent-light: #EEEEFF;
+  --brand-accent-alpha-8: rgba(59, 63, 228, 0.08);
+  --brand-accent-alpha-12: rgba(59, 63, 228, 0.12);
+  --brand-accent-alpha-20: rgba(59, 63, 228, 0.20);
 
   --brand-navy: #1A2B3C;
   --brand-navy-hover: #243A4F;
@@ -52,7 +52,7 @@
   --sidebar-bg: #FFFFFF;
   --sidebar-text: #1A1A1A;
   --sidebar-text-muted: #6B7280;
-  --sidebar-active-bg: rgba(232, 104, 58, 0.08);
+  --sidebar-active-bg: rgba(59, 63, 228, 0.08);
   --sidebar-hover-bg: #F9FAFB;
   --sidebar-divider: #F0F0F0;
 
@@ -78,7 +78,7 @@
   --color-border: #EBEBEB;
   --color-muted-foreground: #6B7280;
   --color-destructive: #DA1E28;
-  --color-primary: #E8683A;
+  --color-primary: #3B3FE4;
   --color-primary-foreground: #FFFFFF;
 
   /* ─── Elevation — deliberately subtle, border-first design ──────── */
