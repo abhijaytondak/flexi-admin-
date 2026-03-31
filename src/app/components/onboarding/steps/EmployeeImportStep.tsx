@@ -103,9 +103,12 @@ export function EmployeeImportStep({ data, onChange }: Props) {
   const previewRows = data.employees.slice(0, 5);
 
   const bandColor: Record<string, { bg: string; color: string }> = {
-    Standard: { bg: "var(--plan-standard-bg)", color: "var(--plan-standard-color)" },
-    Premium: { bg: "var(--plan-premium-bg)", color: "var(--plan-premium-color)" },
-    Executive: { bg: "var(--plan-executive-bg)", color: "var(--plan-executive-color)" },
+    Associate: { bg: "#F0F2F5", color: "#6B7A8D" },
+    "Senior Associate": { bg: "#EBF5FB", color: "#2980B9" },
+    Manager: { bg: "#E8F8EF", color: "#27AE60" },
+    "Senior Manager": { bg: "#F5EEF8", color: "#8E44AD" },
+    AVP: { bg: "#FEF5E7", color: "#E67E22" },
+    VP: { bg: "#D4E6F1", color: "#3498DB" },
   };
 
   return (

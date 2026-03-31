@@ -63,9 +63,12 @@ export interface BenefitCategoryRow {
 }
 
 export interface BenefitPolicyData {
-  Standard: BenefitCategoryRow[];
-  Premium: BenefitCategoryRow[];
-  Executive: BenefitCategoryRow[];
+  Associate: BenefitCategoryRow[];
+  "Senior Associate": BenefitCategoryRow[];
+  Manager: BenefitCategoryRow[];
+  "Senior Manager": BenefitCategoryRow[];
+  AVP: BenefitCategoryRow[];
+  VP: BenefitCategoryRow[];
 }
 
 export interface ImportedEmployee {
@@ -147,9 +150,12 @@ const DEFAULT_STEP_DATA: StepDataMap = {
     sampleCtc: 800000,
   },
   BenefitPolicy: {
-    Standard: makeBenefitRows(1),
-    Premium: makeBenefitRows(1.5),
-    Executive: makeBenefitRows(2),
+    Associate: makeBenefitRows(0.8),
+    "Senior Associate": makeBenefitRows(1),
+    Manager: makeBenefitRows(1.3),
+    "Senior Manager": makeBenefitRows(1.6),
+    AVP: makeBenefitRows(2),
+    VP: makeBenefitRows(2.5),
   },
   EmployeeImport: {
     employees: [],
@@ -183,9 +189,12 @@ function isStepComplete(step: OnboardingStep, data: StepDataMap): boolean {
     case "BenefitPolicy": {
       const d = data.BenefitPolicy;
       return (
-        d.Standard.some((r) => r.enabled) &&
-        d.Premium.some((r) => r.enabled) &&
-        d.Executive.some((r) => r.enabled)
+        d.Associate.some((r) => r.enabled) &&
+        d["Senior Associate"].some((r) => r.enabled) &&
+        d.Manager.some((r) => r.enabled) &&
+        d["Senior Manager"].some((r) => r.enabled) &&
+        d.AVP.some((r) => r.enabled) &&
+        d.VP.some((r) => r.enabled)
       );
     }
     case "EmployeeImport": {

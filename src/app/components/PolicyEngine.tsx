@@ -82,7 +82,7 @@ export function PolicyEngine() {
   // Add bracket form
   const [newName, setNewName] = useState("");
   const [newRange, setNewRange] = useState("");
-  const [newPlan, setNewPlan] = useState<BenefitPlan>("Standard");
+  const [newPlan, setNewPlan] = useState<BenefitPlan>("Associate");
 
   const fetchPolicy = useCallback(async () => {
     setLoading(true);
@@ -155,7 +155,7 @@ export function PolicyEngine() {
     try {
       const res = await api.createBracket({ name: newName, range: newRange, benefitPlan: newPlan, benefits: [] });
       setBrackets(res.all?.map((b: any) => ({ ...b, expanded: false })) ?? [...brackets, { ...res.data, expanded: false }]);
-      setShowAddModal(false); setNewName(""); setNewRange(""); setNewPlan("Standard");
+      setShowAddModal(false); setNewName(""); setNewRange(""); setNewPlan("Associate");
       setSetupRequired(false);
       toast.success("Salary bracket created");
     } catch (e: any) { toast.error(e.message || "Operation failed"); }
@@ -203,7 +203,7 @@ export function PolicyEngine() {
     if (lines.length < 2) { toast.error("CSV must have a header row and at least one data row."); return; }
     const rows = lines.slice(1).map(line => {
       const [name, range, plan] = line.split(",").map(s => s.trim());
-      return { name, range, benefitPlan: plan || "Standard", benefits: [] };
+      return { name, range, benefitPlan: plan || "Associate", benefits: [] };
     });
     setSaving(true);
     try {
@@ -461,9 +461,12 @@ export function PolicyEngine() {
                 </label>
                 <select style={{ ...inputStyle, marginTop: "var(--space-1)" }} value={newPlan}
                   onChange={e => setNewPlan(e.target.value as BenefitPlan)}>
-                  <option value="Standard">Standard</option>
-                  <option value="Premium">Premium</option>
-                  <option value="Executive">Executive</option>
+                  <option value="Associate">Associate</option>
+                  <option value="Senior Associate">Senior Associate</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Senior Manager">Senior Manager</option>
+                  <option value="AVP">AVP</option>
+                  <option value="VP">VP</option>
                 </select>
               </div>
               <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>

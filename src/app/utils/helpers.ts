@@ -2,17 +2,22 @@ import type { BenefitPlan } from "../types";
 
 /** Derive benefit plan from annual CTC */
 export function deriveBenefitPlan(annualCtc: number): BenefitPlan {
-  if (annualCtc >= 1_000_000) return "Executive";
-  if (annualCtc >= 650_000) return "Premium";
-  return "Standard";
+  if (annualCtc >= 2_500_000) return "VP";
+  if (annualCtc >= 1_800_000) return "AVP";
+  if (annualCtc >= 1_200_000) return "Senior Manager";
+  if (annualCtc >= 800_000) return "Manager";
+  if (annualCtc >= 500_000) return "Senior Associate";
+  return "Associate";
 }
 
 /** Derive salary bracket label from CTC */
 export function deriveBracketLabel(annualCtc: number): string {
-  if (annualCtc >= 1_000_000) return "₹10L+";
-  if (annualCtc >= 650_000) return "₹6.5L – ₹10L";
-  if (annualCtc >= 400_000) return "₹4L – ₹6.5L";
-  return "₹2.5L – ₹4L";
+  if (annualCtc >= 2_500_000) return "₹25L+";
+  if (annualCtc >= 1_800_000) return "₹18L – ₹25L";
+  if (annualCtc >= 1_200_000) return "₹12L – ₹18L";
+  if (annualCtc >= 800_000) return "₹8L – ₹12L";
+  if (annualCtc >= 500_000) return "₹5L – ₹8L";
+  return "₹2.5L – ₹5L";
 }
 
 /** Format currency in Indian style */

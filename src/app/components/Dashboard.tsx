@@ -509,23 +509,23 @@ const BENEFIT_CATEGORIES = [
 ];
 
 const DEPARTMENT_DATA = [
-  { dept: "Engineering", count: 135, avgCtc: "12,40,000", standard: 45, premium: 62, executive: 28 },
-  { dept: "Sales", count: 97, avgCtc: "9,80,000", standard: 38, premium: 44, executive: 15 },
-  { dept: "Marketing", count: 64, avgCtc: "10,20,000", standard: 22, premium: 30, executive: 12 },
-  { dept: "Operations", count: 63, avgCtc: "7,50,000", standard: 30, premium: 25, executive: 8 },
-  { dept: "Finance", count: 48, avgCtc: "11,00,000", standard: 18, premium: 20, executive: 10 },
-  { dept: "HR", count: 32, avgCtc: "9,20,000", standard: 12, premium: 14, executive: 6 },
+  { dept: "Engineering", count: 135, avgCtc: "12,40,000", associate: 18, seniorAssociate: 32, manager: 38, seniorManager: 25, avp: 14, vp: 8 },
+  { dept: "Sales", count: 97, avgCtc: "9,80,000", associate: 15, seniorAssociate: 26, manager: 28, seniorManager: 16, avp: 8, vp: 4 },
+  { dept: "Marketing", count: 64, avgCtc: "10,20,000", associate: 10, seniorAssociate: 18, manager: 16, seniorManager: 12, avp: 5, vp: 3 },
+  { dept: "Operations", count: 63, avgCtc: "7,50,000", associate: 14, seniorAssociate: 20, manager: 15, seniorManager: 8, avp: 4, vp: 2 },
+  { dept: "Finance", count: 48, avgCtc: "11,00,000", associate: 8, seniorAssociate: 12, manager: 12, seniorManager: 9, avp: 4, vp: 3 },
+  { dept: "HR", count: 32, avgCtc: "9,20,000", associate: 6, seniorAssociate: 10, manager: 8, seniorManager: 5, avp: 2, vp: 1 },
 ];
 
 const TOP_EMPLOYEES_BY_UTILIZATION = [
-  { name: "Rahul Sharma", dept: "Engineering", plan: "Executive", utilization: 94 },
-  { name: "Priya Patel", dept: "Marketing", plan: "Premium", utilization: 91 },
-  { name: "Amit Kumar", dept: "Sales", plan: "Executive", utilization: 88 },
-  { name: "Sneha Reddy", dept: "Finance", plan: "Premium", utilization: 86 },
-  { name: "Vikram Singh", dept: "Operations", plan: "Standard", utilization: 84 },
-  { name: "Anita Desai", dept: "HR", plan: "Premium", utilization: 82 },
-  { name: "Karthik Nair", dept: "Engineering", plan: "Executive", utilization: 80 },
-  { name: "Meena Iyer", dept: "Sales", plan: "Standard", utilization: 78 },
+  { name: "Rahul Sharma", dept: "Engineering", plan: "VP", utilization: 94 },
+  { name: "Priya Patel", dept: "Marketing", plan: "Manager", utilization: 91 },
+  { name: "Amit Kumar", dept: "Sales", plan: "AVP", utilization: 88 },
+  { name: "Sneha Reddy", dept: "Finance", plan: "Senior Manager", utilization: 86 },
+  { name: "Vikram Singh", dept: "Operations", plan: "Senior Associate", utilization: 84 },
+  { name: "Anita Desai", dept: "HR", plan: "Manager", utilization: 82 },
+  { name: "Karthik Nair", dept: "Engineering", plan: "Senior Manager", utilization: 80 },
+  { name: "Meena Iyer", dept: "Sales", plan: "Associate", utilization: 78 },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1288,9 +1288,12 @@ export function Dashboard() {
                       itemStyle={{ color: "#fff" }}
                       labelStyle={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}
                     />
-                    <Bar dataKey="standard" name="Standard" stackId="a" fill={PLAN_META.Standard.color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="premium" name="Premium" stackId="a" fill={PLAN_META.Premium.color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="executive" name="Executive" stackId="a" fill={PLAN_META.Executive.color} radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="associate" name="Associate" stackId="a" fill={PLAN_META.Associate.color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="seniorAssociate" name="Senior Associate" stackId="a" fill={PLAN_META["Senior Associate"].color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="manager" name="Manager" stackId="a" fill={PLAN_META.Manager.color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="seniorManager" name="Senior Manager" stackId="a" fill={PLAN_META["Senior Manager"].color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="avp" name="AVP" stackId="a" fill={PLAN_META.AVP.color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="vp" name="VP" stackId="a" fill={PLAN_META.VP.color} radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1736,9 +1739,12 @@ export function Dashboard() {
                       itemStyle={{ color: "#fff" }}
                       labelStyle={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}
                     />
-                    <Bar dataKey="standard" name="Standard" stackId="a" fill={PLAN_META.Standard.color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="premium" name="Premium" stackId="a" fill={PLAN_META.Premium.color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="executive" name="Executive" stackId="a" fill={PLAN_META.Executive.color} radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="associate" name="Associate" stackId="a" fill={PLAN_META.Associate.color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="seniorAssociate" name="Senior Associate" stackId="a" fill={PLAN_META["Senior Associate"].color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="manager" name="Manager" stackId="a" fill={PLAN_META.Manager.color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="seniorManager" name="Senior Manager" stackId="a" fill={PLAN_META["Senior Manager"].color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="avp" name="AVP" stackId="a" fill={PLAN_META.AVP.color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="vp" name="VP" stackId="a" fill={PLAN_META.VP.color} radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1989,7 +1995,7 @@ export function Dashboard() {
                 >
                   <thead>
                     <tr>
-                      {["Department", "Employees", "Avg CTC", "Standard", "Premium", "Executive"].map((col) => (
+                      {["Department", "Employees", "Avg CTC", "Associate", "Sr. Assoc.", "Manager", "Sr. Mgr.", "AVP", "VP"].map((col) => (
                         <th
                           key={col}
                           style={{
@@ -2025,15 +2031,15 @@ export function Dashboard() {
                         </td>
                         <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none", fontVariantNumeric: "tabular-nums", color: T.fg }}>{dept.count}</td>
                         <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none", fontVariantNumeric: "tabular-nums", color: T.fg, fontWeight: 500 }}>{dept.avgCtc}</td>
-                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none" }}>
-                          <span style={{ padding: "2px 10px", borderRadius: 100, fontSize: 11, fontWeight: 600, color: PLAN_META.Standard.color, background: PLAN_META.Standard.bgColor }}>{dept.standard}</span>
-                        </td>
-                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none" }}>
-                          <span style={{ padding: "2px 10px", borderRadius: 100, fontSize: 11, fontWeight: 600, color: PLAN_META.Premium.color, background: PLAN_META.Premium.bgColor }}>{dept.premium}</span>
-                        </td>
-                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none" }}>
-                          <span style={{ padding: "2px 10px", borderRadius: 100, fontSize: 11, fontWeight: 600, color: PLAN_META.Executive.color, background: PLAN_META.Executive.bgColor }}>{dept.executive}</span>
-                        </td>
+                        {(["associate", "seniorAssociate", "manager", "seniorManager", "avp", "vp"] as const).map((key) => {
+                          const planKey: Record<string, BenefitPlan> = { associate: "Associate", seniorAssociate: "Senior Associate", manager: "Manager", seniorManager: "Senior Manager", avp: "AVP", vp: "VP" };
+                          const meta = PLAN_META[planKey[key]];
+                          return (
+                            <td key={key} style={{ padding: "12px 8px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none" }}>
+                              <span style={{ padding: "2px 8px", borderRadius: 100, fontSize: 11, fontWeight: 600, color: meta.color, background: meta.bgColor }}>{dept[key]}</span>
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>

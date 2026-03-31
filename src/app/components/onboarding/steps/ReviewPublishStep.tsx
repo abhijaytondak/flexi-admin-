@@ -45,13 +45,16 @@ export function ReviewPublishStep({ data, allData, onChange }: Props) {
 
   const validEmployees = employees.employees.filter((e) => e.valid);
 
-  const bandCounts: Record<BenefitPlan, number> = { Standard: 0, Premium: 0, Executive: 0 };
+  const bandCounts: Record<BenefitPlan, number> = { Associate: 0, "Senior Associate": 0, Manager: 0, "Senior Manager": 0, AVP: 0, VP: 0 };
   validEmployees.forEach((e) => bandCounts[e.band]++);
 
   const planColors: Record<BenefitPlan, { color: string; bg: string; border: string }> = {
-    Standard: { color: "var(--plan-standard-color)", bg: "var(--plan-standard-bg)", border: "var(--plan-standard-border)" },
-    Premium: { color: "var(--plan-premium-color)", bg: "var(--plan-premium-bg)", border: "var(--plan-premium-border)" },
-    Executive: { color: "var(--plan-executive-color)", bg: "var(--plan-executive-bg)", border: "var(--plan-executive-border)" },
+    Associate: { color: "#6B7A8D", bg: "#F0F2F5", border: "#D8DDE4" },
+    "Senior Associate": { color: "#2980B9", bg: "#EBF5FB", border: "#A9D4EE" },
+    Manager: { color: "#27AE60", bg: "#E8F8EF", border: "#B7E4CB" },
+    "Senior Manager": { color: "#8E44AD", bg: "#F5EEF8", border: "#D2B4DE" },
+    AVP: { color: "#E67E22", bg: "#FEF5E7", border: "#F5CBA7" },
+    VP: { color: "#3498DB", bg: "#D4E6F1", border: "#85C1E9" },
   };
 
   return (
@@ -164,7 +167,7 @@ export function ReviewPublishStep({ data, allData, onChange }: Props) {
             <span style={styles.cardTitle}>Benefits per Band</span>
           </div>
           <div style={styles.cardBody}>
-            {(["Standard", "Premium", "Executive"] as BenefitPlan[]).map(
+            {(["Associate", "Senior Associate", "Manager", "Senior Manager", "AVP", "VP"] as BenefitPlan[]).map(
               (plan) => {
                 const rows = benefits[plan].filter((r) => r.enabled);
                 const total = rows.reduce((s, r) => s + r.monthlyLimit, 0);
@@ -216,7 +219,7 @@ export function ReviewPublishStep({ data, allData, onChange }: Props) {
                     {validEmployees.length}
                   </span>
                 </div>
-                {(["Standard", "Premium", "Executive"] as BenefitPlan[]).map(
+                {(["Associate", "Senior Associate", "Manager", "Senior Manager", "AVP", "VP"] as BenefitPlan[]).map(
                   (plan) =>
                     bandCounts[plan] > 0 ? (
                       <div key={plan} style={styles.detailRow}>

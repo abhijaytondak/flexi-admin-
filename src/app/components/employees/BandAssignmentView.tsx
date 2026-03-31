@@ -26,10 +26,10 @@ export function BandAssignmentView({ employees, onRefresh }: Props) {
     );
   }, [employees, search]);
 
-  const columns: BenefitPlan[] = ["Standard", "Premium", "Executive"];
+  const columns: BenefitPlan[] = BENEFIT_PLANS;
 
   const grouped = useMemo(() => {
-    const map: Record<BenefitPlan, Employee[]> = { Standard: [], Premium: [], Executive: [] };
+    const map: Record<BenefitPlan, Employee[]> = Object.fromEntries(BENEFIT_PLANS.map(p => [p, []])) as Record<BenefitPlan, Employee[]>;
     for (const emp of filtered) {
       map[emp.benefitPlan]?.push(emp);
     }
@@ -77,7 +77,7 @@ export function BandAssignmentView({ employees, onRefresh }: Props) {
       </div>
 
       {/* 3-column layout */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }}>
         {columns.map(plan => {
           const meta = PLAN_META[plan];
           const list = grouped[plan];

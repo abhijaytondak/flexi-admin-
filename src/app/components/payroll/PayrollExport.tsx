@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, type CSSProperties } from "react";
 import { Download, Calendar, DollarSign, Users, FileText, BarChart3, X } from "lucide-react";
 import { formatINR, downloadFile } from "../../utils/helpers";
+import { PLAN_META, type BenefitPlan } from "../../types";
 import { StatCard } from "../shared/StatCard";
 import { toast } from "sonner";
 
@@ -39,18 +40,18 @@ interface MockRow {
 }
 
 const BASE_EMPLOYEES: MockRow[] = [
-  { employeeId: "EMP-001", name: "Priya Sharma", dept: "Engineering", band: "Premium", food: 4500, fuel: 3200, comm: 1500, profPursuit: 0, gadget: 6000 },
-  { employeeId: "EMP-002", name: "Rahul Verma", dept: "Engineering", band: "Executive", food: 6000, fuel: 5000, comm: 2000, profPursuit: 12000, gadget: 10000 },
-  { employeeId: "EMP-003", name: "Anita Desai", dept: "Product", band: "Premium", food: 4500, fuel: 0, comm: 1800, profPursuit: 8000, gadget: 5000 },
-  { employeeId: "EMP-004", name: "Vikram Patel", dept: "Sales", band: "Standard", food: 3000, fuel: 2500, comm: 1000, profPursuit: 0, gadget: 0 },
-  { employeeId: "EMP-005", name: "Deepa Nair", dept: "HR", band: "Premium", food: 4500, fuel: 3000, comm: 1500, profPursuit: 5000, gadget: 4000 },
-  { employeeId: "EMP-006", name: "Arjun Singh", dept: "Engineering", band: "Executive", food: 6000, fuel: 4500, comm: 2000, profPursuit: 15000, gadget: 12000 },
-  { employeeId: "EMP-007", name: "Meera Joshi", dept: "Marketing", band: "Standard", food: 3000, fuel: 0, comm: 800, profPursuit: 0, gadget: 0 },
-  { employeeId: "EMP-008", name: "Karthik Reddy", dept: "Engineering", band: "Premium", food: 4500, fuel: 3800, comm: 1500, profPursuit: 0, gadget: 7000 },
-  { employeeId: "EMP-009", name: "Sneha Gupta", dept: "Product", band: "Executive", food: 6000, fuel: 4000, comm: 2500, profPursuit: 10000, gadget: 8000 },
-  { employeeId: "EMP-010", name: "Ravi Kumar", dept: "Sales", band: "Standard", food: 3000, fuel: 2800, comm: 1000, profPursuit: 0, gadget: 0 },
-  { employeeId: "EMP-011", name: "Lakshmi Iyer", dept: "Finance", band: "Premium", food: 4500, fuel: 0, comm: 1200, profPursuit: 6000, gadget: 5500 },
-  { employeeId: "EMP-012", name: "Anil Kapoor", dept: "Operations", band: "Standard", food: 3000, fuel: 2000, comm: 900, profPursuit: 0, gadget: 0 },
+  { employeeId: "EMP-001", name: "Priya Sharma", dept: "Engineering", band: "Senior Associate", food: 3000, fuel: 3200, comm: 1200, profPursuit: 0, gadget: 4000 },
+  { employeeId: "EMP-002", name: "Rahul Verma", dept: "Engineering", band: "Senior Manager", food: 6000, fuel: 5000, comm: 2000, profPursuit: 12000, gadget: 10000 },
+  { employeeId: "EMP-003", name: "Anita Desai", dept: "Product", band: "Manager", food: 4500, fuel: 0, comm: 1500, profPursuit: 8000, gadget: 5000 },
+  { employeeId: "EMP-004", name: "Vikram Patel", dept: "Sales", band: "Associate", food: 2000, fuel: 0, comm: 800, profPursuit: 0, gadget: 0 },
+  { employeeId: "EMP-005", name: "Deepa Nair", dept: "HR", band: "Manager", food: 4500, fuel: 3000, comm: 1500, profPursuit: 5000, gadget: 4000 },
+  { employeeId: "EMP-006", name: "Arjun Singh", dept: "Engineering", band: "VP", food: 10000, fuel: 4500, comm: 3000, profPursuit: 15000, gadget: 12000 },
+  { employeeId: "EMP-007", name: "Meera Joshi", dept: "Marketing", band: "Associate", food: 2000, fuel: 0, comm: 800, profPursuit: 0, gadget: 0 },
+  { employeeId: "EMP-008", name: "Karthik Reddy", dept: "Engineering", band: "Senior Associate", food: 3000, fuel: 3800, comm: 1200, profPursuit: 0, gadget: 5000 },
+  { employeeId: "EMP-009", name: "Sneha Gupta", dept: "Product", band: "AVP", food: 8000, fuel: 4000, comm: 2500, profPursuit: 10000, gadget: 8000 },
+  { employeeId: "EMP-010", name: "Ravi Kumar", dept: "Sales", band: "Senior Associate", food: 3000, fuel: 2800, comm: 1200, profPursuit: 0, gadget: 0 },
+  { employeeId: "EMP-011", name: "Lakshmi Iyer", dept: "Finance", band: "Senior Manager", food: 6000, fuel: 0, comm: 2000, profPursuit: 6000, gadget: 5500 },
+  { employeeId: "EMP-012", name: "Anil Kapoor", dept: "Operations", band: "Associate", food: 2000, fuel: 2000, comm: 800, profPursuit: 0, gadget: 0 },
 ];
 
 /** Generate deterministic mock data per month -- multiplier varies amounts by cycle */
@@ -269,8 +270,8 @@ export function PayrollExport() {
                           <span style={{
                             display: "inline-flex", padding: "1px 8px", borderRadius: "var(--rounded-full)",
                             fontSize: "var(--text-xs)", fontWeight: 600,
-                            color: row.band === "Executive" ? "#3498DB" : row.band === "Premium" ? "#27AE60" : "#6B7A8D",
-                            backgroundColor: row.band === "Executive" ? "#EBF5FB" : row.band === "Premium" ? "#E8F8EF" : "#F0F2F5",
+                            color: PLAN_META[row.band as BenefitPlan]?.color ?? "#6B7A8D",
+                            backgroundColor: PLAN_META[row.band as BenefitPlan]?.bgColor ?? "#F0F2F5",
                           }}>
                             {row.band}
                           </span>

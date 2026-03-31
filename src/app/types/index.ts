@@ -1,6 +1,6 @@
 // ─── Employee ─────────────────────────────────────────────────────────────────
 
-export type BenefitPlan = "Standard" | "Premium" | "Executive";
+export type BenefitPlan = "Associate" | "Senior Associate" | "Manager" | "Senior Manager" | "AVP" | "VP";
 export type EmployeeStatus = "active" | "on-leave" | "inactive" | "invited";
 export type InviteStatus = "not_sent" | "sent" | "accepted";
 
@@ -175,20 +175,32 @@ export interface PlanMeta {
   bracketShort: string;
 }
 
-export const BENEFIT_PLANS: BenefitPlan[] = ["Standard", "Premium", "Executive"];
+export const BENEFIT_PLANS: BenefitPlan[] = ["Associate", "Senior Associate", "Manager", "Senior Manager", "AVP", "VP"];
 
 export const PLAN_META: Record<BenefitPlan, PlanMeta> = {
-  Standard: {
-    label: "Standard", color: "#6B7A8D", bgColor: "#F0F2F5",
-    borderColor: "#D8DDE4", bracketRange: "₹2.5L – ₹6.5L", bracketShort: "Entry & mid CTC",
+  Associate: {
+    label: "Associate", color: "#6B7A8D", bgColor: "#F0F2F5",
+    borderColor: "#D8DDE4", bracketRange: "₹2.5L – ₹5L", bracketShort: "Entry level",
   },
-  Premium: {
-    label: "Premium", color: "#27AE60", bgColor: "#E8F8EF",
-    borderColor: "#B7E4CB", bracketRange: "₹6.5L – ₹10L", bracketShort: "Senior IC",
+  "Senior Associate": {
+    label: "Senior Associate", color: "#2980B9", bgColor: "#EBF5FB",
+    borderColor: "#A9D4EE", bracketRange: "₹5L – ₹8L", bracketShort: "Mid level",
   },
-  Executive: {
-    label: "Executive", color: "#3498DB", bgColor: "#EBF5FB",
-    borderColor: "#A9D4EE", bracketRange: "₹10L+", bracketShort: "Leadership",
+  Manager: {
+    label: "Manager", color: "#27AE60", bgColor: "#E8F8EF",
+    borderColor: "#B7E4CB", bracketRange: "₹8L – ₹12L", bracketShort: "People manager",
+  },
+  "Senior Manager": {
+    label: "Senior Manager", color: "#8E44AD", bgColor: "#F5EEF8",
+    borderColor: "#D2B4DE", bracketRange: "₹12L – ₹18L", bracketShort: "Senior management",
+  },
+  AVP: {
+    label: "AVP", color: "#E67E22", bgColor: "#FEF5E7",
+    borderColor: "#F5CBA7", bracketRange: "₹18L – ₹25L", bracketShort: "Associate Vice President",
+  },
+  VP: {
+    label: "VP", color: "#3498DB", bgColor: "#D4E6F1",
+    borderColor: "#85C1E9", bracketRange: "₹25L+", bracketShort: "Vice President",
   },
 };
 

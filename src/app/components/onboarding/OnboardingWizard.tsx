@@ -130,7 +130,7 @@ export function OnboardingWizard() {
 
       // Save policy brackets from all tiers
       const brackets: any[] = [];
-      (["Standard", "Premium", "Executive"] as const).forEach(tier => {
+      (["Associate", "Senior Associate", "Manager", "Senior Manager", "AVP", "VP"] as const).forEach(tier => {
         stepData.BenefitPolicy[tier]
           .filter(r => r.enabled)
           .forEach(r => {

@@ -10,13 +10,16 @@ interface Props {
 }
 
 const TABS: { key: BenefitPlan; label: string; color: string; bg: string; border: string }[] = [
-  { key: "Standard", label: "Standard", color: "var(--plan-standard-color)", bg: "var(--plan-standard-bg)", border: "var(--plan-standard-border)" },
-  { key: "Premium", label: "Premium", color: "var(--plan-premium-color)", bg: "var(--plan-premium-bg)", border: "var(--plan-premium-border)" },
-  { key: "Executive", label: "Executive", color: "var(--plan-executive-color)", bg: "var(--plan-executive-bg)", border: "var(--plan-executive-border)" },
+  { key: "Associate", label: "Associate", color: "#6B7A8D", bg: "#F0F2F5", border: "#D8DDE4" },
+  { key: "Senior Associate", label: "Sr. Associate", color: "#2980B9", bg: "#EBF5FB", border: "#A9D4EE" },
+  { key: "Manager", label: "Manager", color: "#27AE60", bg: "#E8F8EF", border: "#B7E4CB" },
+  { key: "Senior Manager", label: "Sr. Manager", color: "#8E44AD", bg: "#F5EEF8", border: "#D2B4DE" },
+  { key: "AVP", label: "AVP", color: "#E67E22", bg: "#FEF5E7", border: "#F5CBA7" },
+  { key: "VP", label: "VP", color: "#3498DB", bg: "#D4E6F1", border: "#85C1E9" },
 ];
 
 export function BenefitPolicyStep({ data, onChange }: Props) {
-  const [activeTab, setActiveTab] = useState<BenefitPlan>("Standard");
+  const [activeTab, setActiveTab] = useState<BenefitPlan>("Associate");
   const rows = data[activeTab];
   const activeTabMeta = TABS.find((t) => t.key === activeTab)!;
 
