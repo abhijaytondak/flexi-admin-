@@ -159,6 +159,9 @@ export function ApprovalQueue() {
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [showBulkRejectDialog, setShowBulkRejectDialog] = useState(false);
+  const [bulkRejectReason, setBulkRejectReason] = useState("");
+  const [bulkReturnToLimit, setBulkReturnToLimit] = useState(true);
 
   // Deep linking flag
   const [deepLinkProcessed, setDeepLinkProcessed] = useState(false);
@@ -198,7 +201,10 @@ export function ApprovalQueue() {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (showRejectDialog) {
+        if (showBulkRejectDialog) {
+          setShowBulkRejectDialog(false);
+          setBulkRejectReason("");
+        } else if (showRejectDialog) {
           setShowRejectDialog(false);
           setRejectReason("");
           setReturnToLimit(true);
@@ -318,20 +324,39 @@ export function ApprovalQueue() {
     finally { setBulkLoading(false); }
   };
 
-  const bulkReject = async (filteredClaims: Claim[]) => {
+  const openBulkRejectDialog = () => {
     const ids = Array.from(selectedIds);
     const actionable = ids.filter(id => {
-      const c = filteredClaims.find(cl => cl.id === id);
+      const c = claims.find(cl => cl.id === id);
+      return c && (c.status === "pending" || c.status === "submitted" || c.status === "claimed");
+    });
+    if (actionable.length === 0) {
+      toast.error("No pending claims selected");
+      return;
+    }
+    setBulkRejectReason("");
+    setBulkReturnToLimit(true);
+    setShowBulkRejectDialog(true);
+  };
+
+  const confirmBulkReject = async () => {
+    if (bulkRejectReason.trim().length < 10) return;
+    const ids = Array.from(selectedIds);
+    const actionable = ids.filter(id => {
+      const c = claims.find(cl => cl.id === id);
       return c && (c.status === "pending" || c.status === "submitted" || c.status === "claimed");
     });
     if (actionable.length === 0) return;
     setBulkLoading(true);
+    const fullNote = `${bulkRejectReason}${bulkReturnToLimit ? " [Amount returned to employee limit]" : ""}`;
     const toastId = toast.loading(`Rejecting ${actionable.length} claims...`);
     try {
-      await Promise.all(actionable.map(id => api.updateClaimStatus(id, "rejected", "Bulk rejected")));
-      setClaims(prev => prev.map(c => actionable.includes(c.id) ? { ...c, status: "rejected" as ClaimStatus, actionNote: "Bulk rejected", actionTimestamp: new Date().toISOString() } : c));
+      await Promise.all(actionable.map(id => api.updateClaimStatus(id, "rejected", fullNote)));
+      setClaims(prev => prev.map(c => actionable.includes(c.id) ? { ...c, status: "rejected" as ClaimStatus, actionNote: fullNote, actionTimestamp: new Date().toISOString() } : c));
       toast.success(`${actionable.length} claims rejected`, { id: toastId });
       setSelectedIds(new Set());
+      setShowBulkRejectDialog(false);
+      setBulkRejectReason("");
     } catch (e: any) {
       toast.error(e.message || "Action failed", { id: toastId });
     }
@@ -656,7 +681,7 @@ export function ApprovalQueue() {
           </button>
           <button
             style={{ ...btnPrimary, backgroundColor: "var(--brand-red)", padding: "var(--space-2) var(--space-3)" }}
-            onClick={() => bulkReject(filtered)}
+            onClick={openBulkRejectDialog}
             disabled={bulkLoading}
           >
             {bulkLoading ? <Spinner size={14} /> : <XCircle size={14} />} Reject All
@@ -921,6 +946,112 @@ export function ApprovalQueue() {
               >
                 {rejectLoading ? <Spinner size={16} /> : <XCircle size={16} />}
                 Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Bulk Rejection Dialog */}
+      {showBulkRejectDialog && (
+        <>
+          <div style={{
+            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1100,
+          }} onClick={() => { setShowBulkRejectDialog(false); setBulkRejectReason(""); }} />
+          <div style={{
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            width: 480, maxWidth: "90vw", backgroundColor: "var(--color-card)",
+            borderRadius: "var(--rounded-lg)", boxShadow: "var(--elevation-lg)", zIndex: 1200,
+            padding: "var(--space-6)",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+              <h3 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                Reject {selectedIds.size} Claim{selectedIds.size !== 1 ? "s" : ""}
+              </h3>
+              <button
+                style={{ background: "none", border: "none", cursor: "pointer" }}
+                onClick={() => { setShowBulkRejectDialog(false); setBulkRejectReason(""); }}
+              >
+                <X size={20} style={{ color: "var(--color-muted-foreground)" }} />
+              </button>
+            </div>
+
+            <div style={{
+              padding: "var(--space-3)", backgroundColor: "var(--brand-red-light)",
+              borderRadius: "var(--rounded-md)", marginBottom: "var(--space-4)",
+              display: "flex", alignItems: "center", gap: "var(--space-2)",
+            }}>
+              <AlertCircle size={16} style={{ color: "var(--brand-red)", flexShrink: 0 }} />
+              <span style={{ fontSize: "var(--text-sm)", color: "var(--brand-red)" }}>
+                This will reject {selectedIds.size} selected claim{selectedIds.size !== 1 ? "s" : ""}. Employees will be notified.
+              </span>
+            </div>
+
+            <div style={{ marginBottom: "var(--space-4)" }}>
+              <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Rejection Reason <span style={{ color: "var(--brand-red)" }}>*</span>
+              </label>
+              <textarea
+                style={{
+                  ...inputStyle, marginTop: "var(--space-2)", minHeight: 100, resize: "vertical",
+                  borderColor: bulkRejectReason.trim().length > 0 && bulkRejectReason.trim().length < 10 ? "var(--brand-red)" : "var(--color-border)",
+                }}
+                value={bulkRejectReason}
+                onChange={e => setBulkRejectReason(e.target.value)}
+                placeholder="Enter rejection reason for all selected claims (minimum 10 characters)..."
+                autoFocus
+              />
+              {bulkRejectReason.trim().length > 0 && bulkRejectReason.trim().length < 10 && (
+                <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>
+                  Reason must be at least 10 characters ({bulkRejectReason.trim().length}/10)
+                </p>
+              )}
+            </div>
+
+            <div style={{ marginBottom: "var(--space-5)" }}>
+              <label style={{
+                display: "flex", alignItems: "center", gap: "var(--space-3)",
+                fontSize: "var(--text-sm)", cursor: "pointer", color: "var(--color-foreground)",
+              }}>
+                <div
+                  onClick={() => setBulkReturnToLimit(!bulkReturnToLimit)}
+                  style={{
+                    width: 40, height: 22, borderRadius: 11,
+                    backgroundColor: bulkReturnToLimit ? "var(--brand-green)" : "var(--color-border)",
+                    position: "relative", cursor: "pointer", transition: "background-color 150ms",
+                    flexShrink: 0,
+                  }}
+                >
+                  <div style={{
+                    width: 18, height: 18, borderRadius: "50%", backgroundColor: "#fff",
+                    position: "absolute", top: 2,
+                    left: bulkReturnToLimit ? 20 : 2,
+                    transition: "left 150ms", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                  }} />
+                </div>
+                Return amounts to employees' limits
+              </label>
+            </div>
+
+            <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>
+              <button
+                style={btnGhost}
+                onClick={() => { setShowBulkRejectDialog(false); setBulkRejectReason(""); }}
+                disabled={bulkLoading}
+              >
+                Cancel
+              </button>
+              <button
+                style={{
+                  ...btnPrimary, backgroundColor: "var(--brand-red)",
+                  opacity: bulkRejectReason.trim().length < 10 || bulkLoading ? 0.5 : 1,
+                  cursor: bulkRejectReason.trim().length < 10 || bulkLoading ? "not-allowed" : "pointer",
+                }}
+                onClick={confirmBulkReject}
+                disabled={bulkRejectReason.trim().length < 10 || bulkLoading}
+              >
+                {bulkLoading ? <Spinner size={16} /> : <XCircle size={16} />}
+                Reject {selectedIds.size} Claim{selectedIds.size !== 1 ? "s" : ""}
               </button>
             </div>
           </div>
