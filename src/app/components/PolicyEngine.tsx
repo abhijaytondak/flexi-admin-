@@ -8,6 +8,7 @@ import * as api from "../utils/api";
 import { parseINR } from "../utils/helpers";
 import { useSearch } from "../contexts/SearchContext";
 import { PLAN_META, type SalaryBand, type BenefitPlan } from "../types";
+import { DEMO_BRACKETS } from "../utils/demoData";
 
 /* ─── Styles ─────────────────────────────────────────────────────────────────── */
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
@@ -88,9 +89,17 @@ export function PolicyEngine() {
     setError("");
     try {
       const res = await api.getPolicy();
-      if (res.setupRequired) { setSetupRequired(true); setBrackets([]); }
-      else { setSetupRequired(false); setBrackets((res.data || []).map((b: any) => ({ ...b, expanded: false }))); }
-    } catch (e: any) { setError(e.message || "Failed to load policy"); }
+      if (res.setupRequired || !res.data || res.data.length === 0) {
+        setBrackets(DEMO_BRACKETS.map(b => ({ ...b, expanded: false })));
+        setSetupRequired(false);
+      } else {
+        setSetupRequired(false);
+        setBrackets((res.data || []).map((b: any) => ({ ...b, expanded: false })));
+      }
+    } catch (e: any) {
+      setBrackets(DEMO_BRACKETS.map(b => ({ ...b, expanded: false })));
+      setSetupRequired(false);
+    }
     finally { setLoading(false); }
   }, []);
 

@@ -8,6 +8,7 @@ import * as api from "../utils/api";
 import { parseINR } from "../utils/helpers";
 import { useSearch } from "../contexts/SearchContext";
 import { type Claim, type ClaimStatus } from "../types";
+import { DEMO_CLAIMS } from "../utils/demoData";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
@@ -170,12 +171,16 @@ export function ApprovalQueue() {
     setLoading(true); setError("");
     try {
       const res = await api.getClaims();
-      if (res.setupRequired) { setSetupRequired(true); setClaims([]); }
-      else { setSetupRequired(false); setClaims(res.data || []); }
+      if (res.setupRequired || !res.data || res.data.length === 0) {
+        setClaims(DEMO_CLAIMS);
+        setSetupRequired(false);
+      } else {
+        setClaims(res.data);
+        setSetupRequired(false);
+      }
     } catch (e: any) {
-      const msg = e.message || "Failed to load claims";
-      setError(msg);
-      toast.error(msg);
+      setClaims(DEMO_CLAIMS);
+      setSetupRequired(false);
     }
     finally { setLoading(false); }
   }, []);

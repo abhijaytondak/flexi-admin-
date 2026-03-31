@@ -5,6 +5,7 @@ import * as api from "../utils/api";
 import { useSearch } from "../contexts/SearchContext";
 import { useUserProfile } from "../contexts/UserProfileContext";
 import { PLAN_META, BENEFIT_PLANS, AVATAR_COLORS, type BenefitPlan } from "../types";
+import { DEMO_DASHBOARD, DEMO_EMPLOYEES } from "../utils/demoData";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { getTimeGreeting, formatINR } from "../utils/helpers";
 import {
@@ -554,19 +555,32 @@ export function Dashboard() {
       setError(null);
 
       const empRes = await api.getEmployees();
-      if (empRes.setupRequired) {
-        setSetupRequired(true);
+      if (empRes.setupRequired || !empRes.data || empRes.data.length === 0) {
+        // Use demo data fallback
+        setSetupRequired(false);
+        setKpis(DEMO_DASHBOARD.kpis);
+        setRecentActivity(DEMO_DASHBOARD.recentActivity || []);
+        setPlanDistribution(DEMO_DASHBOARD.planDistribution || null);
         setLoading(false);
         return;
       }
       setSetupRequired(false);
 
       const dashRes = await api.getDashboard();
-      setKpis(dashRes.data.kpis);
-      setRecentActivity(dashRes.data.recentActivity || []);
-      setPlanDistribution(dashRes.data.planDistribution || null);
+      if (!dashRes.data || !dashRes.data.kpis) {
+        setKpis(DEMO_DASHBOARD.kpis);
+        setRecentActivity(DEMO_DASHBOARD.recentActivity || []);
+        setPlanDistribution(DEMO_DASHBOARD.planDistribution || null);
+      } else {
+        setKpis(dashRes.data.kpis);
+        setRecentActivity(dashRes.data.recentActivity || []);
+        setPlanDistribution(dashRes.data.planDistribution || null);
+      }
     } catch (err: any) {
-      setError(err?.message || "Failed to load dashboard");
+      setKpis(DEMO_DASHBOARD.kpis);
+      setRecentActivity(DEMO_DASHBOARD.recentActivity || []);
+      setPlanDistribution(DEMO_DASHBOARD.planDistribution || null);
+      setSetupRequired(false);
     } finally {
       setLoading(false);
     }

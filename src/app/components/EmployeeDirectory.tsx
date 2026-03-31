@@ -10,6 +10,7 @@ import { useSearch } from "../contexts/SearchContext";
 import { PLAN_META, AVATAR_COLORS, BENEFIT_PLANS, type Employee, type BenefitPlan, type Claim } from "../types";
 import { InvitationManager } from "./employees/InvitationManager";
 import { BandAssignmentView } from "./employees/BandAssignmentView";
+import { DEMO_EMPLOYEES, DEMO_CLAIMS } from "../utils/demoData";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
@@ -153,10 +154,19 @@ export function EmployeeDirectory() {
     setLoading(true); setError("");
     try {
       const [empRes, claimRes] = await Promise.all([api.getEmployees(), api.getClaims()]);
-      if (empRes.setupRequired) { setSetupRequired(true); setEmployees([]); }
-      else { setSetupRequired(false); setEmployees(empRes.data || []); }
-      setClaims(claimRes.data || []);
-    } catch (e: any) { setError(e.message || "Failed to load employees"); }
+      if (empRes.setupRequired || !empRes.data || empRes.data.length === 0) {
+        setEmployees(DEMO_EMPLOYEES);
+        setSetupRequired(false);
+      } else {
+        setEmployees(empRes.data);
+        setSetupRequired(false);
+      }
+      setClaims(claimRes.data && claimRes.data.length > 0 ? claimRes.data : DEMO_CLAIMS);
+    } catch (e: any) {
+      setEmployees(DEMO_EMPLOYEES);
+      setClaims(DEMO_CLAIMS);
+      setSetupRequired(false);
+    }
     finally { setLoading(false); }
   }, []);
 

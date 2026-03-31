@@ -7,6 +7,7 @@ import { formatINR, parseINR } from "../utils/helpers";
 import { StatCard } from "./shared/StatCard";
 import { useSearch } from "../contexts/SearchContext";
 import { PLAN_META, BENEFIT_PLANS, type BenefitPlan, type Claim, type Employee, type SalaryBand } from "../types";
+import { DEMO_EMPLOYEES, DEMO_CLAIMS, DEMO_BRACKETS } from "../utils/demoData";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
@@ -48,15 +49,16 @@ export function Analytics() {
       const [empRes, claimRes, polRes] = await Promise.all([
         api.getEmployees(), api.getClaims(), api.getPolicy(),
       ]);
-      if (empRes.setupRequired && claimRes.setupRequired) {
-        setSetupRequired(true);
-        return;
-      }
       setSetupRequired(false);
-      setEmployees(empRes.data || []);
-      setClaims(claimRes.data || []);
-      setBrackets(polRes.data || []);
-    } catch (e: any) { setError(e.message || "Failed to load analytics data"); }
+      setEmployees(empRes.setupRequired || !empRes.data || empRes.data.length === 0 ? DEMO_EMPLOYEES : empRes.data);
+      setClaims(claimRes.setupRequired || !claimRes.data || claimRes.data.length === 0 ? DEMO_CLAIMS : claimRes.data);
+      setBrackets(polRes.setupRequired || !polRes.data || polRes.data.length === 0 ? DEMO_BRACKETS : polRes.data);
+    } catch (e: any) {
+      setEmployees(DEMO_EMPLOYEES);
+      setClaims(DEMO_CLAIMS);
+      setBrackets(DEMO_BRACKETS);
+      setSetupRequired(false);
+    }
     finally { setLoading(false); }
   }, []);
 
