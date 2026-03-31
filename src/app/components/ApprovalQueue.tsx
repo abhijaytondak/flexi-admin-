@@ -170,15 +170,10 @@ export function ApprovalQueue() {
   const fetchClaims = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const res = await api.getClaims();
-      if (res.setupRequired || !res.data || res.data.length === 0) {
-        setClaims(DEMO_CLAIMS);
-        setSetupRequired(false);
-      } else {
-        setClaims(res.data);
-        setSetupRequired(false);
-      }
-    } catch (e: any) {
+      // Always use demo data for client presentation
+      setClaims(DEMO_CLAIMS);
+      setSetupRequired(false);
+    } catch {
       setClaims(DEMO_CLAIMS);
       setSetupRequired(false);
     }

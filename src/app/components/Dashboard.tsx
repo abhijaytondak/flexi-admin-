@@ -553,30 +553,12 @@ export function Dashboard() {
   const fetchDashboard = useCallback(async () => {
     try {
       setError(null);
-
-      const empRes = await api.getEmployees();
-      if (empRes.setupRequired || !empRes.data || empRes.data.length === 0) {
-        // Use demo data fallback
-        setSetupRequired(false);
-        setKpis(DEMO_DASHBOARD.kpis);
-        setRecentActivity(DEMO_DASHBOARD.recentActivity || []);
-        setPlanDistribution(DEMO_DASHBOARD.planDistribution || null);
-        setLoading(false);
-        return;
-      }
+      // Always use demo data for client presentation
       setSetupRequired(false);
-
-      const dashRes = await api.getDashboard();
-      if (!dashRes.data || !dashRes.data.kpis) {
-        setKpis(DEMO_DASHBOARD.kpis);
-        setRecentActivity(DEMO_DASHBOARD.recentActivity || []);
-        setPlanDistribution(DEMO_DASHBOARD.planDistribution || null);
-      } else {
-        setKpis(dashRes.data.kpis);
-        setRecentActivity(dashRes.data.recentActivity || []);
-        setPlanDistribution(dashRes.data.planDistribution || null);
-      }
-    } catch (err: any) {
+      setKpis(DEMO_DASHBOARD.kpis);
+      setRecentActivity(DEMO_DASHBOARD.recentActivity || []);
+      setPlanDistribution(DEMO_DASHBOARD.planDistribution || null);
+    } catch {
       setKpis(DEMO_DASHBOARD.kpis);
       setRecentActivity(DEMO_DASHBOARD.recentActivity || []);
       setPlanDistribution(DEMO_DASHBOARD.planDistribution || null);

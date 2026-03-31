@@ -88,15 +88,10 @@ export function PolicyEngine() {
     setLoading(true);
     setError("");
     try {
-      const res = await api.getPolicy();
-      if (res.setupRequired || !res.data || res.data.length === 0) {
-        setBrackets(DEMO_BRACKETS.map(b => ({ ...b, expanded: false })));
-        setSetupRequired(false);
-      } else {
-        setSetupRequired(false);
-        setBrackets((res.data || []).map((b: any) => ({ ...b, expanded: false })));
-      }
-    } catch (e: any) {
+      // Always use demo data for client presentation
+      setBrackets(DEMO_BRACKETS.map(b => ({ ...b, expanded: false })));
+      setSetupRequired(false);
+    } catch {
       setBrackets(DEMO_BRACKETS.map(b => ({ ...b, expanded: false })));
       setSetupRequired(false);
     }

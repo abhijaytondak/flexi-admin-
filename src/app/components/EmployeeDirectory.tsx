@@ -153,16 +153,11 @@ export function EmployeeDirectory() {
   const fetchData = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [empRes, claimRes] = await Promise.all([api.getEmployees(), api.getClaims()]);
-      if (empRes.setupRequired || !empRes.data || empRes.data.length === 0) {
-        setEmployees(DEMO_EMPLOYEES);
-        setSetupRequired(false);
-      } else {
-        setEmployees(empRes.data);
-        setSetupRequired(false);
-      }
-      setClaims(claimRes.data && claimRes.data.length > 0 ? claimRes.data : DEMO_CLAIMS);
-    } catch (e: any) {
+      // Always use demo data for client presentation
+      setEmployees(DEMO_EMPLOYEES);
+      setClaims(DEMO_CLAIMS);
+      setSetupRequired(false);
+    } catch {
       setEmployees(DEMO_EMPLOYEES);
       setClaims(DEMO_CLAIMS);
       setSetupRequired(false);

@@ -46,14 +46,12 @@ export function Analytics() {
   const fetchAll = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [empRes, claimRes, polRes] = await Promise.all([
-        api.getEmployees(), api.getClaims(), api.getPolicy(),
-      ]);
+      // Always use demo data for client presentation
+      setEmployees(DEMO_EMPLOYEES);
+      setClaims(DEMO_CLAIMS);
+      setBrackets(DEMO_BRACKETS);
       setSetupRequired(false);
-      setEmployees(empRes.setupRequired || !empRes.data || empRes.data.length === 0 ? DEMO_EMPLOYEES : empRes.data);
-      setClaims(claimRes.setupRequired || !claimRes.data || claimRes.data.length === 0 ? DEMO_CLAIMS : claimRes.data);
-      setBrackets(polRes.setupRequired || !polRes.data || polRes.data.length === 0 ? DEMO_BRACKETS : polRes.data);
-    } catch (e: any) {
+    } catch {
       setEmployees(DEMO_EMPLOYEES);
       setClaims(DEMO_CLAIMS);
       setBrackets(DEMO_BRACKETS);
