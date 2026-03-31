@@ -8,6 +8,8 @@ import * as api from "../utils/api";
 import { formatINR, parseINR, deriveBenefitPlan, deriveBracketLabel, getInitials } from "../utils/helpers";
 import { useSearch } from "../contexts/SearchContext";
 import { PLAN_META, AVATAR_COLORS, BENEFIT_PLANS, type Employee, type BenefitPlan, type Claim } from "../types";
+import { InvitationManager } from "./employees/InvitationManager";
+import { BandAssignmentView } from "./employees/BandAssignmentView";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
@@ -112,6 +114,9 @@ export function EmployeeDirectory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [setupRequired, setSetupRequired] = useState(false);
+
+  // Tabs
+  const [activeTab, setActiveTab] = useState<"directory" | "bands" | "invitations">("directory");
 
   // Filters
   const [deptFilter, setDeptFilter] = useState("");
@@ -844,90 +849,134 @@ export function EmployeeDirectory() {
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleCSVImport} />
       </div>
 
-      {/* Filters */}
-      <div style={{ display: "flex", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-        <select style={{ ...inputStyle, width: 200 }} value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
-          <option value="">All Departments</option>
-          {departments.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-        <select style={{ ...inputStyle, width: 160 }} value={planFilter} onChange={e => setPlanFilter(e.target.value)}>
-          <option value="">All Plans</option>
-          {BENEFIT_PLANS.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
-      </div>
-
-      {/* Table */}
+      {/* Tab Navigation */}
       <div style={{
-        backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)",
-        borderRadius: "var(--rounded-lg)", overflow: "hidden",
+        display: "flex", gap: 0, marginBottom: "var(--space-5)",
+        borderBottom: "1px solid var(--color-border)",
       }}>
-        <div style={{
-          display: "grid", gridTemplateColumns: "2.5fr 1.2fr 1.2fr 1fr 0.8fr 0.6fr",
-          gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
-          borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-background)",
-          fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)",
-          textTransform: "uppercase", letterSpacing: "0.04em",
-        }}>
-          <span>Employee</span>
-          <span>Department</span>
-          <span>Designation</span>
-          <span>CTC</span>
-          <span>Plan</span>
-          <span>Status</span>
-        </div>
-
-        {filtered.length === 0 ? (
-          <p style={{ textAlign: "center", padding: "var(--space-8)", color: "var(--color-muted-foreground)", fontSize: "var(--text-sm)" }}>
-            No employees match your filters.
-          </p>
-        ) : (
-          filtered.map((emp, idx) => (
-            <div key={emp.id || idx}
-              onClick={() => openProfile(emp)}
-              style={{
-                display: "grid", gridTemplateColumns: "2.5fr 1.2fr 1.2fr 1fr 0.8fr 0.6fr",
-                gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
-                borderBottom: idx < filtered.length - 1 ? "1px solid var(--color-border)" : "none",
-                cursor: "pointer", transition: "background-color 150ms",
-              }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--color-background)"}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: "var(--rounded-full)",
-                  backgroundColor: emp.color || "var(--brand-navy)",
-                  color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "var(--text-xs)", fontWeight: 600, flexShrink: 0,
-                }}>
-                  {emp.initials || emp.name?.slice(0, 2).toUpperCase()}
-                </div>
-                <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)" }}>
-                  {emp.name}
-                </span>
-              </div>
-              <span style={{ fontSize: "var(--text-sm)", color: "var(--color-foreground)", display: "flex", alignItems: "center" }}>
-                {emp.department}
-              </span>
-              <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center" }}>
-                {emp.designation}
-              </span>
-              <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)", display: "flex", alignItems: "center" }}>
-                {emp.salary}
-              </span>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <span style={planBadge(emp.benefitPlan)}>{emp.benefitPlan}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                <div style={statusDot(emp.status)} />
-                <span style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", textTransform: "capitalize" }}>
-                  {emp.status}
-                </span>
-              </div>
-            </div>
-          ))
-        )}
+        {([
+          { key: "directory" as const, label: "Directory" },
+          { key: "bands" as const, label: "Band Assignment" },
+          { key: "invitations" as const, label: "Invitations" },
+        ]).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{
+              ...font,
+              padding: "10px 20px",
+              fontSize: "var(--text-sm)",
+              fontWeight: activeTab === tab.key ? 600 : 500,
+              color: activeTab === tab.key ? "var(--brand-accent)" : "var(--color-muted-foreground)",
+              backgroundColor: "transparent",
+              border: "none",
+              borderBottom: activeTab === tab.key ? "2px solid var(--brand-accent)" : "2px solid transparent",
+              cursor: "pointer",
+              transition: "color 150ms, border-color 150ms",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      {/* Tab Content */}
+      {activeTab === "directory" && (
+        <>
+          {/* Filters */}
+          <div style={{ display: "flex", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+            <select style={{ ...inputStyle, width: 200 }} value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
+              <option value="">All Departments</option>
+              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <select style={{ ...inputStyle, width: 160 }} value={planFilter} onChange={e => setPlanFilter(e.target.value)}>
+              <option value="">All Plans</option>
+              {BENEFIT_PLANS.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+
+          {/* Table */}
+          <div style={{
+            backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)",
+            borderRadius: "var(--rounded-lg)", overflow: "hidden",
+          }}>
+            <div style={{
+              display: "grid", gridTemplateColumns: "2.5fr 1.2fr 1.2fr 1fr 0.8fr 0.6fr",
+              gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
+              borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-background)",
+              fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)",
+              textTransform: "uppercase", letterSpacing: "0.04em",
+            }}>
+              <span>Employee</span>
+              <span>Department</span>
+              <span>Designation</span>
+              <span>CTC</span>
+              <span>Plan</span>
+              <span>Status</span>
+            </div>
+
+            {filtered.length === 0 ? (
+              <p style={{ textAlign: "center", padding: "var(--space-8)", color: "var(--color-muted-foreground)", fontSize: "var(--text-sm)" }}>
+                No employees match your filters.
+              </p>
+            ) : (
+              filtered.map((emp, idx) => (
+                <div key={emp.id || idx}
+                  onClick={() => openProfile(emp)}
+                  style={{
+                    display: "grid", gridTemplateColumns: "2.5fr 1.2fr 1.2fr 1fr 0.8fr 0.6fr",
+                    gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
+                    borderBottom: idx < filtered.length - 1 ? "1px solid var(--color-border)" : "none",
+                    cursor: "pointer", transition: "background-color 150ms",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--color-background)"}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: "var(--rounded-full)",
+                      backgroundColor: emp.color || "var(--brand-navy)",
+                      color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "var(--text-xs)", fontWeight: 600, flexShrink: 0,
+                    }}>
+                      {emp.initials || emp.name?.slice(0, 2).toUpperCase()}
+                    </div>
+                    <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)" }}>
+                      {emp.name}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: "var(--text-sm)", color: "var(--color-foreground)", display: "flex", alignItems: "center" }}>
+                    {emp.department}
+                  </span>
+                  <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center" }}>
+                    {emp.designation}
+                  </span>
+                  <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)", display: "flex", alignItems: "center" }}>
+                    {emp.salary}
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <span style={planBadge(emp.benefitPlan)}>{emp.benefitPlan}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                    <div style={statusDot(emp.status)} />
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", textTransform: "capitalize" }}>
+                      {emp.status}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      {activeTab === "bands" && (
+        <BandAssignmentView employees={employees} onRefresh={fetchData} />
+      )}
+
+      {activeTab === "invitations" && (
+        <InvitationManager employees={employees} onRefresh={fetchData} />
+      )}
 
       {/* Employee Profile Drawer */}
       {renderDrawer()}

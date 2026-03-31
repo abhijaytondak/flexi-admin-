@@ -137,3 +137,11 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+/* ─── Mobile Responsive ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  :root {
+    --text-2xl: 22px;
+    --text-xl: 18px;
+  }
+}

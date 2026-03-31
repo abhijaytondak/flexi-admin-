@@ -16,10 +16,13 @@ import {
   ChevronsUpDown,
   Filter,
   Calendar,
+  Menu,
+  X,
 } from "lucide-react";
 import { UserProfileProvider, useUserProfile } from "../contexts/UserProfileContext";
 import { SearchProvider, useSearch } from "../contexts/SearchContext";
 import { NotificationDrawer } from "./NotificationDrawer";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 // ─── Nav Items ──────────────────────────────────────────────────────────────
 
@@ -216,13 +219,16 @@ function LayoutInner() {
   const navigate = useNavigate();
   const { profile } = useUserProfile();
   const { query, setQuery } = useSearch();
+  const isMobile = useIsMobile();
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Clear search on route change
+  // Clear search on route change & close mobile sidebar
   useEffect(() => {
     setQuery("");
+    setSidebarOpen(false);
   }, [location.pathname, setQuery]);
 
   const handleUnreadCountChange = useCallback((count: number) => {
@@ -233,6 +239,19 @@ function LayoutInner() {
 
   return (
     <div className="flex" style={{ minHeight: "100vh" }}>
+      {/* ─── Mobile Backdrop ─────────────────────────────────────────── */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            zIndex: 29,
+          }}
+        />
+      )}
+
       {/* ─── Sidebar ─────────────────────────────────────────────────── */}
       <aside
         className="flex flex-col shrink-0"
@@ -247,6 +266,12 @@ function LayoutInner() {
           bottom: 0,
           zIndex: 30,
           borderRight: "1px solid var(--color-border)",
+          transition: "transform 300ms ease",
+          transform: isMobile
+            ? sidebarOpen
+              ? "translateX(0)"
+              : "translateX(-100%)"
+            : "translateX(0)",
         }}
       >
         {/* ── Company / Brand Header ──────────────────────────────────── */}
@@ -284,11 +309,31 @@ function LayoutInner() {
               FlexiBenefits
             </div>
           </div>
-          {/* Expand chevron */}
-          <ChevronsUpDown
-            size={16}
-            style={{ color: "var(--sidebar-text-muted)", flexShrink: 0 }}
-          />
+          {/* Close button on mobile, expand chevron on desktop */}
+          {isMobile ? (
+            <button
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close sidebar"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--sidebar-text-muted)",
+                padding: 4,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <X size={18} />
+            </button>
+          ) : (
+            <ChevronsUpDown
+              size={16}
+              style={{ color: "var(--sidebar-text-muted)", flexShrink: 0 }}
+            />
+          )}
         </div>
 
         {/* ── Sidebar Search ──────────────────────────────────────────── */}
@@ -502,13 +547,13 @@ function LayoutInner() {
       </aside>
 
       {/* ─── Main Area ───────────────────────────────────────────────── */}
-      <div className="flex flex-col flex-1" style={{ marginLeft: 260 }}>
+      <div className="flex flex-col flex-1" style={{ marginLeft: isMobile ? 0 : 260 }}>
         {/* ── Top Bar ─────────────────────────────────────────────────── */}
         <header
           className="flex items-center justify-between shrink-0"
           style={{
             height: 56,
-            padding: "0 24px",
+            padding: isMobile ? "0 12px" : "0 24px",
             backgroundColor: "var(--color-background)",
             borderBottom: "1px solid var(--color-border)",
             position: "sticky",
@@ -516,24 +561,49 @@ function LayoutInner() {
             zIndex: 20,
           }}
         >
-          {/* Breadcrumb */}
+          {/* Left: Hamburger (mobile) + Breadcrumb */}
           <div className="flex items-center gap-2">
-            <Home
-              size={14}
-              style={{ color: "var(--sidebar-text-muted)" }}
-            />
-            <span
-              style={{
-                fontSize: "var(--text-sm)",
-                color: "var(--sidebar-text-muted)",
-              }}
-            >
-              FlexiBenefits
-            </span>
-            <ChevronRight
-              size={12}
-              style={{ color: "var(--color-border)" }}
-            />
+            {isMobile && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Open sidebar"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--sidebar-text-muted)",
+                  padding: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: 4,
+                }}
+              >
+                <Menu size={20} />
+              </button>
+            )}
+            {!isMobile && (
+              <Home
+                size={14}
+                style={{ color: "var(--sidebar-text-muted)" }}
+              />
+            )}
+            {!isMobile && (
+              <span
+                style={{
+                  fontSize: "var(--text-sm)",
+                  color: "var(--sidebar-text-muted)",
+                }}
+              >
+                FlexiBenefits
+              </span>
+            )}
+            {!isMobile && (
+              <ChevronRight
+                size={12}
+                style={{ color: "var(--color-border)" }}
+              />
+            )}
             <span
               style={{
                 fontSize: "var(--text-sm)",
@@ -547,53 +617,57 @@ function LayoutInner() {
 
           {/* Right Side Actions */}
           <div className="flex items-center gap-2">
-            {/* Date range badge */}
-            <button
-              className="flex items-center gap-1.5 transition-colors duration-150"
-              style={{
-                padding: "5px 10px",
-                borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "none",
-                cursor: "pointer",
-                fontSize: "var(--text-sm)",
-                color: "var(--sidebar-text-muted)",
-                fontFamily: "'IBM Plex Sans', sans-serif",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
-            >
-              <Calendar size={13} />
-              <span>Last 30 days</span>
-            </button>
+            {/* Date range badge — hidden on mobile */}
+            {!isMobile && (
+              <button
+                className="flex items-center gap-1.5 transition-colors duration-150"
+                style={{
+                  padding: "5px 10px",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-border)",
+                  background: "none",
+                  cursor: "pointer",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--sidebar-text-muted)",
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
+              >
+                <Calendar size={13} />
+                <span>Last 30 days</span>
+              </button>
+            )}
 
-            {/* Filter button */}
-            <button
-              className="flex items-center gap-1.5 transition-colors duration-150"
-              style={{
-                padding: "5px 10px",
-                borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "none",
-                cursor: "pointer",
-                fontSize: "var(--text-sm)",
-                color: "var(--sidebar-text-muted)",
-                fontFamily: "'IBM Plex Sans', sans-serif",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
-            >
-              <Filter size={13} />
-              <span>Filter</span>
-            </button>
+            {/* Filter button — hidden on mobile */}
+            {!isMobile && (
+              <button
+                className="flex items-center gap-1.5 transition-colors duration-150"
+                style={{
+                  padding: "5px 10px",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-border)",
+                  background: "none",
+                  cursor: "pointer",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--sidebar-text-muted)",
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
+              >
+                <Filter size={13} />
+                <span>Filter</span>
+              </button>
+            )}
 
             {/* Notification Bell */}
             <button

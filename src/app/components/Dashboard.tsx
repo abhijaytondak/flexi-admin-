@@ -5,6 +5,7 @@ import * as api from "../utils/api";
 import { useSearch } from "../contexts/SearchContext";
 import { useUserProfile } from "../contexts/UserProfileContext";
 import { PLAN_META, BENEFIT_PLANS, AVATAR_COLORS, type BenefitPlan } from "../types";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { getTimeGreeting, formatINR } from "../utils/helpers";
 import {
   TrendingUp,
@@ -534,6 +535,7 @@ export function Dashboard() {
   const { profile, saveProfile } = useUserProfile();
   const { query } = useSearch();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   /* ─── State ─────────────────────────────────────────────────────────── */
   const [loading, setLoading] = useState(true);
@@ -865,6 +867,8 @@ export function Dashboard() {
             display: "flex",
             gap: 0,
             borderBottom: `1px solid ${T.border}`,
+            overflowX: isMobile ? "auto" : "visible",
+            WebkitOverflowScrolling: "touch" as any,
           }}
         >
           {tabs.map((tab) => {
@@ -883,6 +887,7 @@ export function Dashboard() {
                   borderBottom: isActive ? `2px solid ${T.accent}` : "2px solid transparent",
                   cursor: "pointer",
                   fontFamily: T.font,
+                  whiteSpace: "nowrap",
                   transition: "color 150ms",
                   marginBottom: -1,
                 }}
@@ -978,8 +983,8 @@ export function Dashboard() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: `repeat(${kpiMetrics.length}, 1fr)`,
-                gap: 0,
+                gridTemplateColumns: isMobile ? "1fr 1fr" : `repeat(${kpiMetrics.length}, 1fr)`,
+                gap: isMobile ? 16 : 0,
                 borderTop: `1px solid ${T.border}`,
                 paddingTop: 20,
               }}
@@ -1061,7 +1066,7 @@ export function Dashboard() {
           </div>
 
           {/* ─── 3. CHARTS ROW 1 ──────────────────────────────────────── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
             {/* Benefit Utilization — Area chart */}
             <div style={cardStyle}>
               <div style={cardHeaderStyle}>
@@ -1222,7 +1227,7 @@ export function Dashboard() {
           </div>
 
           {/* ─── 4. CHARTS ROW 2 ──────────────────────────────────────── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
             {/* Plan Distribution — Horizontal stacked bar */}
             <div style={cardStyle}>
               <div style={cardHeaderStyle}>
@@ -1607,7 +1612,7 @@ export function Dashboard() {
           {/* ═══ BENEFITS TAB ═══════════════════════════════════════════ */}
           {activeTab === "Benefits" && <>
             {/* Plan Distribution Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 20 }}>
               {BENEFIT_PLANS.map((plan) => {
                 const meta = PLAN_META[plan];
                 const planKey = plan.toLowerCase() as "standard" | "premium" | "executive";
@@ -1656,7 +1661,7 @@ export function Dashboard() {
                   <p style={cardSubtitleStyle}>Category limits and utilization rates</p>
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
                 {BENEFIT_CATEGORIES.map((cat) => (
                   <div
                     key={cat.name}
@@ -1755,7 +1760,7 @@ export function Dashboard() {
           {/* ═══ CLAIMS TAB ═════════════════════════════════════════════ */}
           {activeTab === "Claims" && <>
             {/* Claim Status Summary */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 20 }}>
               {[
                 { label: "Total Claims", value: claimStatusCounts.total, color: T.blue, bg: T.blueBg, icon: FileText },
                 { label: "Approved", value: claimStatusCounts.approved, color: T.green, bg: T.greenBg, icon: Check },
@@ -2048,7 +2053,7 @@ export function Dashboard() {
                   <p style={cardSubtitleStyle}>Employees with highest benefit plan usage</p>
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                 {TOP_EMPLOYEES_BY_UTILIZATION.map((emp) => {
                   const planColor = PLAN_META[emp.plan as BenefitPlan]?.color || T.muted;
                   const planBg = PLAN_META[emp.plan as BenefitPlan]?.bgColor || T.bg;
