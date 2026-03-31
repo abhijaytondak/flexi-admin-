@@ -12,7 +12,10 @@ import {
   IndianRupee,
   PieChart,
   RefreshCcw,
+  AlertTriangle,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { formatINR } from "../../utils/helpers";
 import { useFiscalYear } from "../../hooks/useFiscalYear";
 
@@ -34,6 +37,7 @@ export function FYEndSummary() {
   const { currentFY, daysUntilFYEnd, isDeclarationWindowOpen } = useFiscalYear();
   const [windowOpen, setWindowOpen] = useState(isDeclarationWindowOpen);
   const [reminderSent, setReminderSent] = useState(false);
+  const [showLockConfirm, setShowLockConfirm] = useState(false);
 
   const utilizationPct = Math.round((MOCK.utilized / MOCK.allocated) * 100);
 
@@ -47,8 +51,30 @@ export function FYEndSummary() {
   ];
 
   const handleSendReminder = () => {
-    setReminderSent(true);
-    setTimeout(() => setReminderSent(false), 3000);
+    try {
+      setReminderSent(true);
+      setTimeout(() => setReminderSent(false), 3000);
+      toast.success(`Reminders sent to ${MOCK.pendingCount} employees`);
+    } catch {
+      toast.error("Failed to send reminders");
+    }
+  };
+
+  const handleToggleDeclarations = () => {
+    if (windowOpen) {
+      // Locking -- show confirmation dialog
+      setShowLockConfirm(true);
+    } else {
+      // Opening
+      setWindowOpen(true);
+      toast.success("Declaration window opened");
+    }
+  };
+
+  const confirmLock = () => {
+    setWindowOpen(false);
+    setShowLockConfirm(false);
+    toast.success("Declarations locked successfully");
   };
 
   return (
@@ -248,7 +274,7 @@ export function FYEndSummary() {
           </div>
 
           <button
-            onClick={() => setWindowOpen((o) => !o)}
+            onClick={handleToggleDeclarations}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -270,6 +296,69 @@ export function FYEndSummary() {
           </button>
         </div>
       </div>
+
+      {/* Lock Confirmation Dialog */}
+      {showLockConfirm && (
+        <div
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.4)", zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={() => setShowLockConfirm(false)}
+        >
+          <div
+            style={{
+              background: "var(--color-card)", borderRadius: 16, padding: 32,
+              width: 440, maxWidth: "90vw",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: "50%",
+                background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <AlertTriangle size={20} style={{ color: "var(--brand-red)" }} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--brand-navy)" }}>
+                Lock Declarations?
+              </h3>
+            </div>
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: "#6b7280", margin: "0 0 24px" }}>
+              This will prevent all employees from submitting or modifying their benefit declarations.
+              {MOCK.pendingCount > 0 && (
+                <span style={{ display: "block", marginTop: 8, color: "var(--brand-amber)", fontWeight: 600 }}>
+                  {MOCK.pendingCount} employees have not yet submitted their declarations.
+                </span>
+              )}
+            </p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowLockConfirm(false)}
+                style={{
+                  padding: "8px 20px", border: "1px solid var(--color-border)",
+                  borderRadius: 8, background: "var(--color-card)", fontSize: 14,
+                  fontWeight: 600, color: "#374151", cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmLock}
+                style={{
+                  padding: "8px 20px", border: "none", borderRadius: 8,
+                  background: "var(--brand-red)", fontSize: 14,
+                  fontWeight: 600, color: "#fff", cursor: "pointer",
+                }}
+              >
+                Lock Declarations
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

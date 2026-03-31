@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import {
   Building2,
   Wallet,
@@ -8,7 +8,12 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
+import { toast } from "sonner";
+import { useNavigate } from "react-router";
+import * as api from "../../utils/api";
 import {
   useOnboardingState,
   STEPS,
@@ -29,11 +34,145 @@ const STEP_ICONS: Record<OnboardingStep, React.ReactNode> = {
   ReviewPublish: <Rocket size={20} />,
 };
 
+function getStepValidationErrors(step: OnboardingStep, data: any): string[] {
+  const errors: string[] = [];
+  switch (step) {
+    case "CompanyProfile": {
+      const d = data.CompanyProfile;
+      if (!d.companyName) errors.push("Company name is required");
+      if (!d.industry) errors.push("Industry is required");
+      if (!d.companySize) errors.push("Company size is required");
+      if (!d.hrAdminName) errors.push("HR Admin name is required");
+      if (!d.hrAdminEmail) errors.push("HR Admin email is required");
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.hrAdminEmail)) errors.push("HR Admin email is invalid");
+      break;
+    }
+    case "SalaryStructure": {
+      const d = data.SalaryStructure;
+      const total = d.components.reduce((sum: number, c: any) => sum + c.percent, 0);
+      if (total < 95 || total > 105) errors.push(`Component total is ${total}% (must be 95-105%)`);
+      break;
+    }
+    case "BenefitPolicy": {
+      const d = data.BenefitPolicy;
+      if (!d.Standard.some((r: any) => r.enabled)) errors.push("At least one Standard benefit must be enabled");
+      if (!d.Premium.some((r: any) => r.enabled)) errors.push("At least one Premium benefit must be enabled");
+      if (!d.Executive.some((r: any) => r.enabled)) errors.push("At least one Executive benefit must be enabled");
+      break;
+    }
+    case "EmployeeImport": {
+      const d = data.EmployeeImport;
+      if (!d.skipped && d.employees.filter((e: any) => e.valid).length === 0) {
+        errors.push("Import at least one valid employee or skip this step");
+      }
+      break;
+    }
+    case "ReviewPublish": {
+      const c = data.ReviewPublish.checklist;
+      if (!c.companyVerified) errors.push("Verify company profile");
+      if (!c.salaryVerified) errors.push("Verify salary structure");
+      if (!c.benefitsVerified) errors.push("Verify benefit policy");
+      if (!c.employeesVerified) errors.push("Verify employee data");
+      break;
+    }
+  }
+  return errors;
+}
+
 export function OnboardingWizard() {
   const state = useOnboardingState();
   const { currentStep, currentIndex, canProceed, nextStep, prevStep, goToStep, isComplete } = state;
+  const navigate = useNavigate();
+  const [publishing, setPublishing] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const progressPercent = ((currentIndex + 1) / STEPS.length) * 100;
+
+  const currentErrors = useMemo(
+    () => getStepValidationErrors(currentStep, state.stepData),
+    [currentStep, state.stepData]
+  );
+
+  const handleNext = () => {
+    const errors = getStepValidationErrors(currentStep, state.stepData);
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    setValidationErrors([]);
+    toast.success("Step completed");
+    nextStep();
+  };
+
+  const handlePublish = async () => {
+    const errors = getStepValidationErrors("ReviewPublish", state.stepData);
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+
+    setPublishing(true);
+    setValidationErrors([]);
+    try {
+      const { stepData } = state;
+
+      // Import employees if any were provided
+      if (!stepData.EmployeeImport.skipped && stepData.EmployeeImport.employees.length > 0) {
+        const validEmployees = stepData.EmployeeImport.employees
+          .filter(e => e.valid)
+          .map(e => ({
+            name: e.name,
+            email: e.email,
+            department: e.department,
+            designation: e.designation,
+            annualCtc: e.annualCtc,
+            band: e.band,
+          }));
+        if (validEmployees.length > 0) {
+          await api.bulkImportEmployees(validEmployees);
+        }
+      }
+
+      // Save policy brackets from all tiers
+      const brackets: any[] = [];
+      (["Standard", "Premium", "Executive"] as const).forEach(tier => {
+        stepData.BenefitPolicy[tier]
+          .filter(r => r.enabled)
+          .forEach(r => {
+            brackets.push({
+              band: tier,
+              category: r.name,
+              monthlyLimit: r.monthlyLimit,
+              billRequired: r.billRequired,
+              carryForward: r.carryForward,
+            });
+          });
+      });
+      if (brackets.length > 0) {
+        await api.savePolicy(brackets);
+      }
+
+      // Save company profile
+      await api.saveProfile({
+        companyName: stepData.CompanyProfile.companyName,
+        industry: stepData.CompanyProfile.industry,
+        companySize: stepData.CompanyProfile.companySize,
+        fiscalYearStart: stepData.CompanyProfile.fiscalYearStart,
+        payrollDay: stepData.CompanyProfile.payrollDay,
+        hrAdminName: stepData.CompanyProfile.hrAdminName,
+        hrAdminEmail: stepData.CompanyProfile.hrAdminEmail,
+        hrAdminPhone: stepData.CompanyProfile.hrAdminPhone,
+        hrAdminDesignation: stepData.CompanyProfile.hrAdminDesignation,
+      });
+
+      toast.success("Your FlexiBenefits policy is now live!");
+      navigate("/");
+    } catch (e: any) {
+      toast.error("Failed to publish");
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const renderStep = () => {
     switch (currentStep) {
@@ -41,28 +180,28 @@ export function OnboardingWizard() {
         return (
           <CompanyProfileStep
             data={state.stepData.CompanyProfile}
-            onChange={(d) => state.setStepData("CompanyProfile", d)}
+            onChange={(d) => { state.setStepData("CompanyProfile", d); setValidationErrors([]); }}
           />
         );
       case "SalaryStructure":
         return (
           <SalaryStructureStep
             data={state.stepData.SalaryStructure}
-            onChange={(d) => state.setStepData("SalaryStructure", d)}
+            onChange={(d) => { state.setStepData("SalaryStructure", d); setValidationErrors([]); }}
           />
         );
       case "BenefitPolicy":
         return (
           <BenefitPolicyStep
             data={state.stepData.BenefitPolicy}
-            onChange={(d) => state.setStepData("BenefitPolicy", d)}
+            onChange={(d) => { state.setStepData("BenefitPolicy", d); setValidationErrors([]); }}
           />
         );
       case "EmployeeImport":
         return (
           <EmployeeImportStep
             data={state.stepData.EmployeeImport}
-            onChange={(d) => state.setStepData("EmployeeImport", d)}
+            onChange={(d) => { state.setStepData("EmployeeImport", d); setValidationErrors([]); }}
           />
         );
       case "ReviewPublish":
@@ -70,7 +209,7 @@ export function OnboardingWizard() {
           <ReviewPublishStep
             data={state.stepData.ReviewPublish}
             allData={state.stepData}
-            onChange={(d) => state.setStepData("ReviewPublish", d)}
+            onChange={(d) => { state.setStepData("ReviewPublish", d); setValidationErrors([]); }}
           />
         );
     }
@@ -78,7 +217,10 @@ export function OnboardingWizard() {
 
   return (
     <div style={styles.root}>
-      {/* ─── Progress bar ─────────────────────────────────────────── */}
+      {/* Spinner keyframe */}
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+      {/* Progress bar */}
       <div style={styles.progressTrack}>
         <div
           style={{ ...styles.progressFill, width: `${progressPercent}%` }}
@@ -86,7 +228,7 @@ export function OnboardingWizard() {
       </div>
 
       <div style={styles.layout}>
-        {/* ─── Sidebar ──────────────────────────────────────────── */}
+        {/* Sidebar */}
         <aside style={styles.sidebar}>
           <div style={styles.sidebarHeader}>
             <div style={styles.logo}>S</div>
@@ -150,7 +292,7 @@ export function OnboardingWizard() {
                         style={{
                           ...styles.stepLabel,
                           color: active
-                            ? "#fff"
+                            ? "var(--color-foreground)"
                             : "var(--sidebar-text-muted)",
                           fontWeight: active ? 600 : 400,
                         }}
@@ -172,11 +314,34 @@ export function OnboardingWizard() {
           </div>
         </aside>
 
-        {/* ─── Content ──────────────────────────────────────────── */}
+        {/* Content */}
         <main style={styles.content}>
-          <div style={styles.contentInner}>{renderStep()}</div>
+          <div style={styles.contentInner}>
+            {renderStep()}
 
-          {/* ─── Bottom bar ──────────────────────────────────── */}
+            {/* Inline validation errors */}
+            {validationErrors.length > 0 && (
+              <div style={{
+                marginTop: 16, padding: "12px 16px",
+                backgroundColor: "rgba(239, 68, 68, 0.06)",
+                border: "1px solid rgba(239, 68, 68, 0.2)",
+                borderRadius: "var(--rounded-md)",
+              }}>
+                {validationErrors.map((err, i) => (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    fontSize: "var(--text-sm)", color: "var(--brand-red, #ef4444)",
+                    padding: "2px 0",
+                  }}>
+                    <AlertCircle size={14} />
+                    {err}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Bottom bar */}
           <div style={styles.bottomBar}>
             <button
               onClick={prevStep}
@@ -197,7 +362,7 @@ export function OnboardingWizard() {
 
             {currentIndex < STEPS.length - 1 ? (
               <button
-                onClick={nextStep}
+                onClick={handleNext}
                 disabled={!canProceed}
                 style={{
                   ...styles.btnPrimary,
@@ -210,15 +375,25 @@ export function OnboardingWizard() {
               </button>
             ) : (
               <button
-                disabled={!canProceed}
+                onClick={handlePublish}
+                disabled={!canProceed || publishing}
                 style={{
                   ...styles.btnGreen,
-                  opacity: canProceed ? 1 : 0.5,
-                  cursor: canProceed ? "pointer" : "default",
+                  opacity: canProceed && !publishing ? 1 : 0.5,
+                  cursor: canProceed && !publishing ? "pointer" : "default",
                 }}
               >
-                <Rocket size={16} />
-                Go Live
+                {publishing ? (
+                  <>
+                    <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    <Rocket size={16} />
+                    Go Live
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -256,17 +431,18 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sidebar: {
     width: 280,
-    background: "var(--sidebar-bg)",
+    background: "#FFFFFF",
     display: "flex",
     flexDirection: "column",
     flexShrink: 0,
+    borderRight: "1px solid var(--color-border)",
   },
   sidebarHeader: {
     padding: "24px 20px",
     display: "flex",
     alignItems: "center",
     gap: 12,
-    borderBottom: "1px solid var(--sidebar-divider)",
+    borderBottom: "1px solid var(--color-border)",
   },
   logo: {
     width: 36,
@@ -281,13 +457,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "var(--text-lg)",
   },
   brandName: {
-    color: "#fff",
+    color: "var(--color-foreground)",
     fontWeight: 600,
     fontSize: "var(--text-lg)",
     lineHeight: 1.2,
   },
   brandSub: {
-    color: "var(--sidebar-text-muted)",
+    color: "var(--color-muted-foreground)",
     fontSize: "var(--text-xs)",
     marginTop: 2,
   },
@@ -318,6 +494,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     width: "100%",
     transition: "background-color 0.2s ease",
+    background: "transparent",
   },
   stepIcon: {
     width: 36,
@@ -336,16 +513,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   stepNumber: {
     fontSize: "var(--text-xs)",
-    color: "var(--sidebar-text-muted)",
+    color: "var(--color-muted-foreground)",
     marginTop: 1,
     opacity: 0.7,
   },
   sidebarFooter: {
     padding: "16px 20px",
-    borderTop: "1px solid var(--sidebar-divider)",
+    borderTop: "1px solid var(--color-border)",
   },
   helpText: {
-    color: "var(--sidebar-text-muted)",
+    color: "var(--color-muted-foreground)",
     fontSize: "var(--text-xs)",
     textAlign: "center",
   },

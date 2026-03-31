@@ -10,6 +10,7 @@ import {
   Save,
   AlertCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useFiscalYear } from "../../hooks/useFiscalYear";
 
 export function DeadlineManager() {
@@ -23,8 +24,13 @@ export function DeadlineManager() {
   const { currentFY, currentCycle } = useFiscalYear("April", payrollDay, offsetDays);
 
   const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      toast.success("Deadline configuration saved successfully");
+    } catch {
+      toast.error("Failed to save deadline configuration");
+    }
   };
 
   const deadlinePassed = currentCycle.daysRemaining <= 0;

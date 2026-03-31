@@ -1,7 +1,8 @@
-import React, { useState, useCallback, type CSSProperties } from "react";
-import { Download, Calendar, DollarSign, Users, FileText, BarChart3 } from "lucide-react";
+import React, { useState, useCallback, useMemo, type CSSProperties } from "react";
+import { Download, Calendar, DollarSign, Users, FileText, BarChart3, X } from "lucide-react";
 import { formatINR, downloadFile } from "../../utils/helpers";
 import { StatCard } from "../shared/StatCard";
+import { toast } from "sonner";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
@@ -38,7 +39,7 @@ interface MockRow {
   nps: number;
 }
 
-const MOCK_DATA: MockRow[] = [
+const BASE_EMPLOYEES: MockRow[] = [
   { employeeId: "EMP-001", name: "Priya Sharma", dept: "Engineering", band: "Premium", food: 4500, fuel: 3200, comm: 1500, lta: 0, nps: 6000 },
   { employeeId: "EMP-002", name: "Rahul Verma", dept: "Engineering", band: "Executive", food: 6000, fuel: 5000, comm: 2000, lta: 12000, nps: 10000 },
   { employeeId: "EMP-003", name: "Anita Desai", dept: "Product", band: "Premium", food: 4500, fuel: 0, comm: 1800, lta: 8000, nps: 5000 },
@@ -53,6 +54,26 @@ const MOCK_DATA: MockRow[] = [
   { employeeId: "EMP-012", name: "Anil Kapoor", dept: "Operations", band: "Standard", food: 3000, fuel: 2000, comm: 900, lta: 0, nps: 0 },
 ];
 
+/** Generate deterministic mock data per month -- multiplier varies amounts by cycle */
+function getDataForMonth(month: string): MockRow[] {
+  const idx = MONTHS.indexOf(month);
+  if (idx < 0) return [];
+  // Future months have no data
+  const now = new Date();
+  if (idx > now.getMonth()) return [];
+  // Apply a multiplier so each month looks different
+  const multipliers = [1, 0.9, 1.1, 0.85, 1.05, 0.95, 1.15, 0.8, 1.0, 0.92, 1.08, 0.88];
+  const m = multipliers[idx];
+  return BASE_EMPLOYEES.map((row) => ({
+    ...row,
+    food: Math.round(row.food * m),
+    fuel: Math.round(row.fuel * m),
+    comm: Math.round(row.comm * m),
+    lta: Math.round(row.lta * m),
+    nps: Math.round(row.nps * m),
+  }));
+}
+
 function total(row: MockRow): number {
   return row.food + row.fuel + row.comm + row.lta + row.nps;
 }
@@ -65,10 +86,14 @@ export function PayrollExport() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
   const [selectedYear] = useState(now.getFullYear());
+  const [selectedRow, setSelectedRow] = useState<MockRow | null>(null);
 
-  const totalReimbursable = MOCK_DATA.reduce((s, r) => s + total(r), 0);
-  const employeesWithClaims = MOCK_DATA.filter(r => total(r) > 0).length;
-  const totalClaimsCount = MOCK_DATA.reduce((s, r) => {
+  // Filter data by selected cycle
+  const filteredData = useMemo(() => getDataForMonth(selectedMonth), [selectedMonth]);
+
+  const totalReimbursable = filteredData.reduce((s, r) => s + total(r), 0);
+  const employeesWithClaims = filteredData.filter(r => total(r) > 0).length;
+  const totalClaimsCount = filteredData.reduce((s, r) => {
     let count = 0;
     if (r.food > 0) count++;
     if (r.fuel > 0) count++;
@@ -81,23 +106,34 @@ export function PayrollExport() {
 
   // Column totals
   const colTotals = {
-    food: MOCK_DATA.reduce((s, r) => s + r.food, 0),
-    fuel: MOCK_DATA.reduce((s, r) => s + r.fuel, 0),
-    comm: MOCK_DATA.reduce((s, r) => s + r.comm, 0),
-    lta: MOCK_DATA.reduce((s, r) => s + r.lta, 0),
-    nps: MOCK_DATA.reduce((s, r) => s + r.nps, 0),
+    food: filteredData.reduce((s, r) => s + r.food, 0),
+    fuel: filteredData.reduce((s, r) => s + r.fuel, 0),
+    comm: filteredData.reduce((s, r) => s + r.comm, 0),
+    lta: filteredData.reduce((s, r) => s + r.lta, 0),
+    nps: filteredData.reduce((s, r) => s + r.nps, 0),
   };
   const grandTotal = colTotals.food + colTotals.fuel + colTotals.comm + colTotals.lta + colTotals.nps;
 
   const handleExport = useCallback(() => {
-    const headers = ["Employee ID", "Name", "Department", "Band", "Food", "Fuel", "Comm", "LTA", "NPS", "Total"];
-    const rows = MOCK_DATA.map(r =>
-      [r.employeeId, r.name, r.dept, r.band, r.food, r.fuel, r.comm, r.lta, r.nps, total(r)].join(",")
-    );
-    const totalsRow = ["", "TOTALS", "", "", colTotals.food, colTotals.fuel, colTotals.comm, colTotals.lta, colTotals.nps, grandTotal].join(",");
-    const csv = [headers.join(","), ...rows, totalsRow].join("\n");
-    downloadFile(csv, `payroll_${selectedMonth}_${selectedYear}.csv`);
-  }, [selectedMonth, selectedYear, colTotals, grandTotal]);
+    try {
+      if (filteredData.length === 0) {
+        toast.error("Failed to generate report");
+        return;
+      }
+      const headers = ["Employee ID", "Name", "Department", "Band", "Food", "Fuel", "Communication", "LTA", "NPS", "Total Claims", "Total Amount"];
+      const rows = filteredData.map(r => {
+        const claimsCount = [r.food, r.fuel, r.comm, r.lta, r.nps].filter(v => v > 0).length;
+        return [r.employeeId, `"${r.name}"`, r.dept, r.band, r.food, r.fuel, r.comm, r.lta, r.nps, claimsCount, total(r)].join(",");
+      });
+      const totalClaimsSum = filteredData.reduce((s, r) => s + [r.food, r.fuel, r.comm, r.lta, r.nps].filter(v => v > 0).length, 0);
+      const totalsRow = ["", "TOTALS", "", "", colTotals.food, colTotals.fuel, colTotals.comm, colTotals.lta, colTotals.nps, totalClaimsSum, grandTotal].join(",");
+      const csv = [headers.join(","), ...rows, totalsRow].join("\n");
+      downloadFile(csv, `payroll_${selectedMonth}_${selectedYear}.csv`);
+      toast.success("Payroll report downloaded");
+    } catch {
+      toast.error("Failed to generate report");
+    }
+  }, [selectedMonth, selectedYear, filteredData, colTotals, grandTotal]);
 
   const thStyle: CSSProperties = {
     textAlign: "left", padding: "var(--space-3) var(--space-3)",
@@ -203,72 +239,91 @@ export function PayrollExport() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_DATA.map((row, idx) => {
-                const rowTotal = total(row);
-                return (
-                  <tr key={row.employeeId}
-                    style={{ transition: "background-color 150ms" }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--color-background)"}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}>
-                    <td style={mutedTd}>{row.employeeId}</td>
-                    <td style={{ ...tdStyle, fontWeight: 500 }}>{row.name}</td>
-                    <td style={tdStyle}>{row.dept}</td>
-                    <td style={tdStyle}>
-                      <span style={{
-                        display: "inline-flex", padding: "1px 8px", borderRadius: "var(--rounded-full)",
-                        fontSize: "var(--text-xs)", fontWeight: 600,
-                        color: row.band === "Executive" ? "#3498DB" : row.band === "Premium" ? "#27AE60" : "#6B7A8D",
-                        backgroundColor: row.band === "Executive" ? "#EBF5FB" : row.band === "Premium" ? "#E8F8EF" : "#F0F2F5",
-                      }}>
-                        {row.band}
-                      </span>
+              {filteredData.length === 0 ? (
+                <tr>
+                  <td colSpan={10} style={{ padding: "var(--space-8)", textAlign: "center" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--space-3)" }}>
+                      <FileText size={40} style={{ color: "var(--color-muted-foreground)", opacity: 0.4 }} />
+                      <p style={{ margin: 0, fontSize: "var(--text-base)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                        No approved claims
+                      </p>
+                      <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
+                        There are no approved claims for {selectedMonth} {selectedYear}. Try selecting a different month.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {filteredData.map((row) => {
+                    const rowTotal = total(row);
+                    return (
+                      <tr key={row.employeeId}
+                        style={{ transition: "background-color 150ms", cursor: "pointer" }}
+                        onClick={() => setSelectedRow(row)}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--color-background)"}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}>
+                        <td style={mutedTd}>{row.employeeId}</td>
+                        <td style={{ ...tdStyle, fontWeight: 500 }}>{row.name}</td>
+                        <td style={tdStyle}>{row.dept}</td>
+                        <td style={tdStyle}>
+                          <span style={{
+                            display: "inline-flex", padding: "1px 8px", borderRadius: "var(--rounded-full)",
+                            fontSize: "var(--text-xs)", fontWeight: 600,
+                            color: row.band === "Executive" ? "#3498DB" : row.band === "Premium" ? "#27AE60" : "#6B7A8D",
+                            backgroundColor: row.band === "Executive" ? "#EBF5FB" : row.band === "Premium" ? "#E8F8EF" : "#F0F2F5",
+                          }}>
+                            {row.band}
+                          </span>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right", color: row.food === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                          {amountCell(row.food)}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right", color: row.fuel === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                          {amountCell(row.fuel)}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right", color: row.comm === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                          {amountCell(row.comm)}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right", color: row.lta === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                          {amountCell(row.lta)}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right", color: row.nps === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
+                          {amountCell(row.nps)}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>
+                          {formatINR(rowTotal)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Totals Row */}
+                  <tr style={{ backgroundColor: "var(--color-background)" }}>
+                    <td style={{ ...tdStyle, fontWeight: 700, borderBottom: "none" }} colSpan={4}>
+                      TOTALS
                     </td>
-                    <td style={{ ...tdStyle, textAlign: "right", color: row.food === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
-                      {amountCell(row.food)}
+                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
+                      {formatINR(colTotals.food)}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: "right", color: row.fuel === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
-                      {amountCell(row.fuel)}
+                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
+                      {formatINR(colTotals.fuel)}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: "right", color: row.comm === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
-                      {amountCell(row.comm)}
+                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
+                      {formatINR(colTotals.comm)}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: "right", color: row.lta === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
-                      {amountCell(row.lta)}
+                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
+                      {formatINR(colTotals.lta)}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: "right", color: row.nps === 0 ? "var(--color-muted-foreground)" : "var(--color-foreground)" }}>
-                      {amountCell(row.nps)}
+                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
+                      {formatINR(colTotals.nps)}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>
-                      {formatINR(rowTotal)}
+                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none", color: "var(--brand-navy)" }}>
+                      {formatINR(grandTotal)}
                     </td>
                   </tr>
-                );
-              })}
-
-              {/* Totals Row */}
-              <tr style={{ backgroundColor: "var(--color-background)" }}>
-                <td style={{ ...tdStyle, fontWeight: 700, borderBottom: "none" }} colSpan={4}>
-                  TOTALS
-                </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
-                  {formatINR(colTotals.food)}
-                </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
-                  {formatINR(colTotals.fuel)}
-                </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
-                  {formatINR(colTotals.comm)}
-                </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
-                  {formatINR(colTotals.lta)}
-                </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none" }}>
-                  {formatINR(colTotals.nps)}
-                </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, borderBottom: "none", color: "var(--brand-navy)" }}>
-                  {formatINR(grandTotal)}
-                </td>
-              </tr>
+                </>
+              )}
             </tbody>
           </table>
         </div>
@@ -281,6 +336,86 @@ export function PayrollExport() {
       }}>
         Payroll data for {selectedMonth} {selectedYear}. Export as CSV for processing in your payroll system.
       </p>
+
+      {/* Employee Detail Drawer */}
+      {selectedRow && (
+        <div
+          style={{
+            position: "fixed", top: 0, right: 0, bottom: 0, left: 0,
+            backgroundColor: "rgba(0,0,0,0.4)", zIndex: 1000,
+            display: "flex", justifyContent: "flex-end",
+          }}
+          onClick={() => setSelectedRow(null)}
+        >
+          <div
+            style={{
+              width: 420, maxWidth: "90vw", height: "100%", backgroundColor: "var(--color-card)",
+              boxShadow: "-4px 0 24px rgba(0,0,0,0.12)", padding: "var(--space-6)",
+              overflowY: "auto", ...font,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-5)" }}>
+              <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 700, color: "var(--color-foreground)" }}>
+                Claims Breakdown
+              </h2>
+              <button
+                onClick={() => setSelectedRow(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: "var(--space-1)", color: "var(--color-muted-foreground)" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: "var(--space-5)" }}>
+              <h3 style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-base)", fontWeight: 600 }}>{selectedRow.name}</h3>
+              <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
+                {selectedRow.employeeId} &middot; {selectedRow.dept} &middot; {selectedRow.band}
+              </p>
+              <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                Period: {selectedMonth} {selectedYear}
+              </p>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+              {[
+                { label: "Food & Meals", value: selectedRow.food },
+                { label: "Fuel & Travel", value: selectedRow.fuel },
+                { label: "Communication", value: selectedRow.comm },
+                { label: "Leave Travel Allowance", value: selectedRow.lta },
+                { label: "NPS Contribution", value: selectedRow.nps },
+              ].map(item => (
+                <div key={item.label} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "var(--space-3) var(--space-4)",
+                  backgroundColor: item.value > 0 ? "var(--color-background)" : "transparent",
+                  borderRadius: "var(--rounded-md)",
+                  border: "1px solid var(--color-border)",
+                }}>
+                  <span style={{ fontSize: "var(--text-sm)", color: "var(--color-foreground)" }}>{item.label}</span>
+                  <span style={{
+                    fontSize: "var(--text-sm)", fontWeight: 600,
+                    color: item.value > 0 ? "var(--color-foreground)" : "var(--color-muted-foreground)",
+                  }}>
+                    {item.value > 0 ? formatINR(item.value) : "\u2014"}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{
+              marginTop: "var(--space-5)", paddingTop: "var(--space-4)",
+              borderTop: "2px solid var(--color-border)",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <span style={{ fontSize: "var(--text-base)", fontWeight: 700 }}>Total</span>
+              <span style={{ fontSize: "var(--text-lg)", fontWeight: 700, color: "var(--brand-navy)" }}>
+                {formatINR(total(selectedRow))}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

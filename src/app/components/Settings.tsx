@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, type CSSProperties } from "react";
+import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
   User, Palette, Bell, GitBranch, Shield, Database, Save, Check,
-  AlertCircle, ToggleLeft, ToggleRight
+  AlertCircle, ToggleLeft, ToggleRight, Loader2
 } from "lucide-react";
+import { toast } from "sonner";
 import * as api from "../utils/api";
 import { useUserProfile, AVATAR_COLORS } from "../contexts/UserProfileContext";
 import { getInitials } from "../utils/helpers";
@@ -51,13 +52,25 @@ type TabId = typeof TABS[number]["id"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DIGEST_OPTIONS = ["realtime", "daily", "weekly", "never"] as const;
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export function Settings() {
   const { profile, updateProfile, saveProfile, saving: profileSaving } = useUserProfile();
 
   const [activeTab, setActiveTab] = useState<TabId>("profile");
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
+
+  // Track unsaved changes per tab
+  const [dirtyTabs, setDirtyTabs] = useState<Set<TabId>>(new Set());
+
+  // Snapshot of original profile for dirty tracking
+  const profileSnapshotRef = useRef<string>("");
+  const settingsSnapshotRef = useRef<string>("");
+
+  // Preview avatar color (only applied on save)
+  const [previewAvatarColor, setPreviewAvatarColor] = useState<string>(profile.avatarColor);
 
   // Local settings state (for workflow/security/notifications/data tabs)
   const [settings, setSettings] = useState({
@@ -84,42 +97,110 @@ export function Settings() {
     (async () => {
       try {
         const res = await api.getSettings();
-        if (res.data) setSettings(prev => ({ ...prev, ...res.data }));
+        if (res.data) {
+          setSettings(prev => {
+            const merged = { ...prev, ...res.data };
+            settingsSnapshotRef.current = JSON.stringify(merged);
+            return merged;
+          });
+        }
       } catch { /* use defaults */ }
     })();
   }, []);
 
+  // Update snapshot when profile loads
+  useEffect(() => {
+    profileSnapshotRef.current = JSON.stringify({
+      name: profile.name, designation: profile.designation,
+      email: profile.email, employeeId: profile.employeeId,
+      avatarColor: profile.avatarColor,
+    });
+    setPreviewAvatarColor(profile.avatarColor);
+  }, []);
+
+  // Mark tab dirty on profile field changes
+  const markDirty = (tab: TabId) => {
+    setDirtyTabs(prev => {
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
+  };
+
+  const clearDirty = (tab: TabId) => {
+    setDirtyTabs(prev => {
+      const next = new Set(prev);
+      next.delete(tab);
+      return next;
+    });
+  };
+
   const handleSaveSection = useCallback(async () => {
-    setSaving(true); setError(""); setSaved(false);
+    setSaving(true);
     try {
       if (activeTab === "profile") {
-        await saveProfile();
+        // Validate email
+        if (!isValidEmail(profile.email)) {
+          toast.error("Please enter a valid email address");
+          setSaving(false);
+          return;
+        }
+        // Apply preview avatar color to profile before saving
+        updateProfile({ avatarColor: previewAvatarColor });
+        await saveProfile({ avatarColor: previewAvatarColor });
+        toast.success("Profile updated");
       } else if (activeTab === "appearance") {
-        await saveProfile({ dashboardCards: profile.dashboardCards, fiscalYearStart: profile.fiscalYearStart });
+        await saveProfile({ dashboardCards: profile.dashboardCards, fiscalYearStart: profile.fiscalYearStart, showGreeting: profile.showGreeting });
+        toast.success("Appearance updated");
       } else {
         await api.saveSettings(settings);
         if (activeTab === "data") {
           await saveProfile({ exportFormat: settings.exportFormat as any, dataRetention: settings.dataRetention as any });
         }
+        toast.success("Settings saved");
       }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (e: any) { setError(e.message || "Failed to save settings"); }
-    finally { setSaving(false); }
-  }, [activeTab, settings, profile, saveProfile]);
+      clearDirty(activeTab);
+    } catch (e: any) {
+      toast.error("Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }, [activeTab, settings, profile, saveProfile, previewAvatarColor, updateProfile]);
 
   const updateSetting = (key: string, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+    // Determine which tab this setting belongs to
+    const notifKeys = ["emailEnabled", "slackEnabled", "digestFrequency", "notifyOnClaim", "notifyOnApproval", "notifyOnNewEmployee", "notifyOnPolicyChange"];
+    const workflowKeys = ["autoApproveThreshold", "escalationHours"];
+    const securityKeys = ["twoFactorEnabled", "sessionTimeout"];
+    const dataKeys = ["exportFormat", "dataRetention"];
+    if (notifKeys.includes(key)) markDirty("notifications");
+    else if (workflowKeys.includes(key)) markDirty("workflow");
+    else if (securityKeys.includes(key)) markDirty("security");
+    else if (dataKeys.includes(key)) markDirty("data");
   };
 
   const toggleDashboardCard = (key: keyof DashboardCards) => {
     updateProfile({
       dashboardCards: { ...profile.dashboardCards, [key]: !profile.dashboardCards[key] },
     });
+    markDirty("appearance");
   };
 
   const renderToggle = (value: boolean, onChange: () => void) => (
-    <button style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }} onClick={onChange}>
+    <button
+      style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+      onClick={onChange}
+      tabIndex={0}
+      role="switch"
+      aria-checked={value}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onChange();
+        }
+      }}
+    >
       {value
         ? <ToggleRight size={24} style={{ color: "var(--brand-green)" }} />
         : <ToggleLeft size={24} style={{ color: "var(--color-muted-foreground)" }} />}
@@ -152,6 +233,28 @@ export function Settings() {
     </div>
   );
 
+  const renderSaveButton = () => (
+    <div style={{
+      display: "flex", alignItems: "center", gap: "var(--space-3)",
+      marginTop: "var(--space-6)", paddingTop: "var(--space-4)",
+      borderTop: "1px solid var(--color-border)",
+    }}>
+      <button style={{
+        ...btnPrimary,
+        opacity: saving || profileSaving ? 0.7 : 1,
+      }} onClick={handleSaveSection}
+        disabled={saving || profileSaving}
+        onMouseEnter={e => { if (!saving && !profileSaving) e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"; }}
+        onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
+        {saving || profileSaving ? (
+          <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Saving...</>
+        ) : (
+          <><Save size={14} /> Save Changes</>
+        )}
+      </button>
+    </div>
+  );
+
   const renderTabContent = () => {
     switch (activeTab) {
       case "profile":
@@ -165,9 +268,10 @@ export function Settings() {
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", marginBottom: "var(--space-6)" }}>
               <div style={{
                 width: 64, height: 64, borderRadius: "var(--rounded-full)",
-                backgroundColor: profile.avatarColor, color: "#fff",
+                backgroundColor: previewAvatarColor, color: "#fff",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: "var(--text-xl)", fontWeight: 700,
+                transition: "background-color 200ms ease",
               }}>
                 {profile.initials}
               </div>
@@ -177,10 +281,10 @@ export function Settings() {
                 </p>
                 <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
                   {AVATAR_COLORS.map(c => (
-                    <button key={c} onClick={() => updateProfile({ avatarColor: c })}
+                    <button key={c} onClick={() => { setPreviewAvatarColor(c); markDirty("profile"); }}
                       style={{
                         width: 24, height: 24, borderRadius: "50%", backgroundColor: c,
-                        border: profile.avatarColor === c ? "2px solid var(--color-foreground)" : "2px solid transparent",
+                        border: previewAvatarColor === c ? "2px solid var(--color-foreground)" : "2px solid transparent",
                         cursor: "pointer", padding: 0,
                         transition: "transform 100ms",
                       }}
@@ -195,21 +299,23 @@ export function Settings() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
               {renderField("Name",
                 <input style={inputStyle} value={profile.name}
-                  onChange={e => updateProfile({ name: e.target.value, initials: getInitials(e.target.value) })} />
+                  onChange={e => { updateProfile({ name: e.target.value, initials: getInitials(e.target.value) }); markDirty("profile"); }} />
               )}
               {renderField("Designation",
                 <input style={inputStyle} value={profile.designation}
-                  onChange={e => updateProfile({ designation: e.target.value })} />
+                  onChange={e => { updateProfile({ designation: e.target.value }); markDirty("profile"); }} />
               )}
               {renderField("Email",
                 <input style={inputStyle} value={profile.email} type="email"
-                  onChange={e => updateProfile({ email: e.target.value })} />
+                  onChange={e => { updateProfile({ email: e.target.value }); markDirty("profile"); }} />
               )}
               {renderField("Employee ID",
                 <input style={inputStyle} value={profile.employeeId}
-                  onChange={e => updateProfile({ employeeId: e.target.value })} />
+                  onChange={e => { updateProfile({ employeeId: e.target.value }); markDirty("profile"); }} />
               )}
             </div>
+
+            {renderSaveButton()}
           </div>
         );
 
@@ -239,14 +345,16 @@ export function Settings() {
 
             {renderField("Fiscal Year Start",
               <select style={inputStyle} value={profile.fiscalYearStart}
-                onChange={e => updateProfile({ fiscalYearStart: e.target.value })}>
+                onChange={e => { updateProfile({ fiscalYearStart: e.target.value }); markDirty("appearance"); }}>
                 {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             )}
 
             {renderToggleRow("Show Greeting", "Display time-based greeting on dashboard",
-              profile.showGreeting, () => updateProfile({ showGreeting: !profile.showGreeting })
+              profile.showGreeting, () => { updateProfile({ showGreeting: !profile.showGreeting }); markDirty("appearance"); }
             )}
+
+            {renderSaveButton()}
           </div>
         );
 
@@ -295,6 +403,8 @@ export function Settings() {
                 settings.notifyOnPolicyChange, () => updateSetting("notifyOnPolicyChange", !settings.notifyOnPolicyChange)
               )}
             </div>
+
+            {renderSaveButton()}
           </div>
         );
 
@@ -324,6 +434,8 @@ export function Settings() {
                 </p>
               </div>
             )}
+
+            {renderSaveButton()}
           </div>
         );
 
@@ -349,6 +461,8 @@ export function Settings() {
                 </div>
               )}
             </div>
+
+            {renderSaveButton()}
           </div>
         );
 
@@ -382,6 +496,8 @@ export function Settings() {
                 </p>
               </div>
             )}
+
+            {renderSaveButton()}
           </div>
         );
 
@@ -392,6 +508,9 @@ export function Settings() {
 
   return (
     <div style={{ ...font, padding: "var(--space-6)" }}>
+      {/* Spinner keyframe */}
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
       {/* Header */}
       <div style={{ marginBottom: "var(--space-5)" }}>
         <h1 style={{ margin: 0, fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--color-foreground)" }}>
@@ -409,6 +528,7 @@ export function Settings() {
         }}>
           {TABS.map(tab => {
             const isActive = activeTab === tab.id;
+            const isDirty = dirtyTabs.has(tab.id);
             const TabIcon = tab.icon;
             return (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
@@ -420,11 +540,19 @@ export function Settings() {
                 backgroundColor: isActive ? "var(--brand-navy-alpha-08)" : "transparent",
                 color: isActive ? "var(--brand-navy)" : "var(--color-muted-foreground)",
                 transition: "all 150ms",
+                position: "relative",
               }}
                 onMouseEnter={e => { if (!isActive) e.currentTarget.style.backgroundColor = "var(--color-background)"; }}
                 onMouseLeave={e => { if (!isActive) e.currentTarget.style.backgroundColor = "transparent"; }}>
                 <TabIcon size={16} />
                 {tab.label}
+                {isDirty && (
+                  <span style={{
+                    width: 6, height: 6, borderRadius: "50%",
+                    backgroundColor: "var(--brand-accent)",
+                    marginLeft: "auto", flexShrink: 0,
+                  }} />
+                )}
               </button>
             );
           })}
@@ -433,36 +561,6 @@ export function Settings() {
         {/* Tab Content */}
         <div style={sectionCard}>
           {renderTabContent()}
-
-          {/* Save Button */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: "var(--space-3)",
-            marginTop: "var(--space-6)", paddingTop: "var(--space-4)",
-            borderTop: "1px solid var(--color-border)",
-          }}>
-            <button style={btnPrimary} onClick={handleSaveSection}
-              disabled={saving || profileSaving}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
-              {saving || profileSaving ? (
-                <><Save size={14} /> Saving...</>
-              ) : saved ? (
-                <><Check size={14} /> Saved</>
-              ) : (
-                <><Save size={14} /> Save Changes</>
-              )}
-            </button>
-            {error && (
-              <span style={{ fontSize: "var(--text-sm)", color: "var(--brand-red)", display: "flex", alignItems: "center", gap: 4 }}>
-                <AlertCircle size={14} /> {error}
-              </span>
-            )}
-            {saved && !error && (
-              <span style={{ fontSize: "var(--text-sm)", color: "var(--brand-green)", display: "flex", alignItems: "center", gap: 4 }}>
-                <Check size={14} /> Settings saved successfully
-              </span>
-            )}
-          </div>
         </div>
       </div>
     </div>

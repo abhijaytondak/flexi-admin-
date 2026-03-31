@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import * as api from "../utils/api";
 import { useSearch } from "../contexts/SearchContext";
 import { useUserProfile } from "../contexts/UserProfileContext";
@@ -26,6 +28,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   FileText,
+  Briefcase,
+  Building2,
 } from "lucide-react";
 import {
   PieChart,
@@ -195,8 +199,15 @@ function AvatarEditorPopover({
         onClose();
       }
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [onClose]);
 
   return (
@@ -457,9 +468,72 @@ function DropdownSelector({ value, options }: { value: string; options?: string[
    Dashboard — main export
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Fiscal year date range helper
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const MONTH_NAMES = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
+
+function getFiscalYearRange(fiscalYearStart: string) {
+  const monthIdx = MONTH_NAMES.findIndex(
+    (m) => m.toLowerCase() === (fiscalYearStart || "april").toLowerCase()
+  );
+  const startMonth = monthIdx >= 0 ? monthIdx : 3; // default April
+  const now = new Date();
+  let startYear = now.getFullYear();
+  // If we haven't reached the FY start month yet this calendar year, FY started last year
+  if (now.getMonth() < startMonth) startYear -= 1;
+  const start = new Date(startYear, startMonth, 1);
+  const end = new Date(startYear + 1, startMonth, 0); // last day of month before next FY start
+  const fmt = (d: Date) =>
+    `${d.toLocaleString("en-US", { month: "short" })} ${d.getDate()}, ${d.getFullYear()}`;
+  return `${fmt(start)} - ${fmt(end)}`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Static data for Benefits / Claims / Employees tabs
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const BENEFIT_CATEGORIES = [
+  { name: "Food & Meals", limit: "2,200/mo", utilization: 78, color: T.accent },
+  { name: "Fuel & Travel", limit: "1,600/mo", utilization: 64, color: T.blue },
+  { name: "Communication", limit: "1,000/mo", utilization: 52, color: T.green },
+  { name: "Leave Travel", limit: "25,000/yr", utilization: 34, color: T.purple },
+  { name: "Professional Pursuit", limit: "15,000/yr", utilization: 41, color: T.amber },
+  { name: "Gadget Allowance", limit: "20,000/yr", utilization: 28, color: "#1ABC9C" },
+];
+
+const DEPARTMENT_DATA = [
+  { dept: "Engineering", count: 135, avgCtc: "12,40,000", standard: 45, premium: 62, executive: 28 },
+  { dept: "Sales", count: 97, avgCtc: "9,80,000", standard: 38, premium: 44, executive: 15 },
+  { dept: "Marketing", count: 64, avgCtc: "10,20,000", standard: 22, premium: 30, executive: 12 },
+  { dept: "Operations", count: 63, avgCtc: "7,50,000", standard: 30, premium: 25, executive: 8 },
+  { dept: "Finance", count: 48, avgCtc: "11,00,000", standard: 18, premium: 20, executive: 10 },
+  { dept: "HR", count: 32, avgCtc: "9,20,000", standard: 12, premium: 14, executive: 6 },
+];
+
+const TOP_EMPLOYEES_BY_UTILIZATION = [
+  { name: "Rahul Sharma", dept: "Engineering", plan: "Executive", utilization: 94 },
+  { name: "Priya Patel", dept: "Marketing", plan: "Premium", utilization: 91 },
+  { name: "Amit Kumar", dept: "Sales", plan: "Executive", utilization: 88 },
+  { name: "Sneha Reddy", dept: "Finance", plan: "Premium", utilization: 86 },
+  { name: "Vikram Singh", dept: "Operations", plan: "Standard", utilization: 84 },
+  { name: "Anita Desai", dept: "HR", plan: "Premium", utilization: 82 },
+  { name: "Karthik Nair", dept: "Engineering", plan: "Executive", utilization: 80 },
+  { name: "Meena Iyer", dept: "Sales", plan: "Standard", utilization: 78 },
+];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dashboard — main export
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 export function Dashboard() {
   const { profile, saveProfile } = useUserProfile();
   const { query } = useSearch();
+  const navigate = useNavigate();
 
   /* ─── State ─────────────────────────────────────────────────────────── */
   const [loading, setLoading] = useState(true);
@@ -502,17 +576,32 @@ export function Dashboard() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchDashboard();
-    setRefreshing(false);
+    try {
+      await fetchDashboard();
+      toast.success("Dashboard refreshed");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to refresh dashboard");
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   /* ─── Avatar save ───────────────────────────────────────────────────── */
   const handleAvatarSave = async (initials: string, color: string) => {
     try {
       await saveProfile({ initials, avatarColor: color });
-    } catch { /* handled in context */ }
-    setShowAvatarEditor(false);
+      toast.success("Avatar updated");
+      setShowAvatarEditor(false);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update avatar");
+    }
   };
+
+  /* ─── Fiscal year date range ─────────────────────────────────────────── */
+  const fiscalDateRange = useMemo(
+    () => getFiscalYearRange(profile.fiscalYearStart),
+    [profile.fiscalYearStart]
+  );
 
   /* ─── Filter activity by search ─────────────────────────────────────── */
   const filteredActivity = recentActivity.filter((item) => {
@@ -522,9 +611,24 @@ export function Dashboard() {
       item.employeeName?.toLowerCase().includes(q) ||
       item.type?.toLowerCase().includes(q) ||
       item.claimId?.toLowerCase().includes(q) ||
-      item.action?.toLowerCase().includes(q)
+      item.action?.toLowerCase().includes(q) ||
+      item.amount?.toString().toLowerCase().includes(q) ||
+      item.category?.toLowerCase().includes(q)
     );
   });
+
+  /* ─── Claim status counts for Claims tab ───────────────────────────── */
+  const claimStatusCounts = useMemo(() => {
+    let approved = 0, rejected = 0, pending = 0;
+    recentActivity.forEach((item) => {
+      const isApproved = item.action === "approved" || item.status === "approved";
+      const isRejected = item.action === "rejected" || item.status === "rejected";
+      if (isApproved) approved++;
+      else if (isRejected) rejected++;
+      else pending++;
+    });
+    return { approved, rejected, pending, total: recentActivity.length };
+  }, [recentActivity]);
 
   /* ═══════════════════════════════════════════════════════════════════════
      LOADING STATE
@@ -706,7 +810,7 @@ export function Dashboard() {
               onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.border)}
             >
               <Calendar size={14} style={{ color: T.muted }} />
-              Apr 1, 2025 - Mar 31, 2026
+              {fiscalDateRange}
             </button>
             <button
               style={{
@@ -807,14 +911,14 @@ export function Dashboard() {
             alignItems: "center",
             justifyContent: "center",
             textAlign: "center",
-            minHeight: 320,
+            minHeight: 400,
             gap: 16,
           }}
         >
           <div
             style={{
-              width: 64,
-              height: 64,
+              width: 72,
+              height: 72,
               borderRadius: "50%",
               background: T.blueBg,
               display: "flex",
@@ -822,19 +926,20 @@ export function Dashboard() {
               justifyContent: "center",
             }}
           >
-            <Upload size={28} style={{ color: T.blue }} />
+            <Briefcase size={32} style={{ color: T.blue }} />
           </div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: T.fg }}>
-            Welcome to SalarySe FlexiBenefits
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: T.fg }}>
+            Welcome! Let's set up your benefits
           </h2>
-          <p style={{ margin: 0, fontSize: 14, color: T.muted, maxWidth: 400, lineHeight: 1.6 }}>
+          <p style={{ margin: 0, fontSize: 14, color: T.muted, maxWidth: 420, lineHeight: 1.7 }}>
             Import employees to get started. Once you have employees enrolled in
             benefit plans, your dashboard analytics will appear here.
           </p>
           <button
+            onClick={() => navigate("/onboarding")}
             style={{
               marginTop: 8,
-              padding: "10px 24px",
+              padding: "12px 28px",
               background: T.accent,
               color: "#fff",
               border: "none",
@@ -852,7 +957,7 @@ export function Dashboard() {
             onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
           >
             <Upload size={14} />
-            Import Employees
+            Start Setup
           </button>
         </div>
       )}
@@ -860,6 +965,9 @@ export function Dashboard() {
       {/* ═══ MAIN DASHBOARD CONTENT ═══════════════════════════════════════ */}
       {!setupRequired && (
         <>
+
+          {/* ═══ OVERVIEW TAB ═══════════════════════════════════════════ */}
+          {activeTab === "Overview" && <>
           {/* ─── 2. PERFORMANCE SUMMARY ───────────────────────────────── */}
           <div style={cardStyle}>
             <div style={{ marginBottom: 20 }}>
@@ -1494,6 +1602,509 @@ export function Dashboard() {
               </div>
             )}
           </div>
+          </>}
+
+          {/* ═══ BENEFITS TAB ═══════════════════════════════════════════ */}
+          {activeTab === "Benefits" && <>
+            {/* Plan Distribution Cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+              {BENEFIT_PLANS.map((plan) => {
+                const meta = PLAN_META[plan];
+                const planKey = plan.toLowerCase() as "standard" | "premium" | "executive";
+                const totalCount = PLAN_DISTRIBUTION_DATA.reduce((sum, d) => sum + d[planKey], 0);
+                return (
+                  <div
+                    key={plan}
+                    style={{
+                      ...cardStyle,
+                      borderLeft: `4px solid ${meta.color}`,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 10,
+                          background: meta.bgColor,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <ShieldCheck size={20} style={{ color: meta.color }} />
+                      </div>
+                      <div>
+                        <h3 style={{ ...cardTitleStyle, fontSize: 15 }}>{plan}</h3>
+                        <p style={{ ...cardSubtitleStyle, margin: 0 }}>{meta.bracketRange}</p>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: T.fg, marginBottom: 4, fontVariantNumeric: "tabular-nums" }}>
+                      {totalCount}
+                    </div>
+                    <p style={{ fontSize: 12, color: T.muted, margin: 0 }}>employees enrolled</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Benefit Categories & Limits */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <div>
+                  <h3 style={cardTitleStyle}>Benefit Categories</h3>
+                  <p style={cardSubtitleStyle}>Category limits and utilization rates</p>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                {BENEFIT_CATEGORIES.map((cat) => (
+                  <div
+                    key={cat.name}
+                    style={{
+                      padding: 16,
+                      borderRadius: 10,
+                      border: `1px solid ${T.border}`,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: T.fg }}>{cat.name}</span>
+                      <span style={{ fontSize: 12, color: T.muted, fontVariantNumeric: "tabular-nums" }}>{cat.utilization}%</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: T.muted }}>Limit: {cat.limit}</div>
+                    {/* Utilization gauge */}
+                    <div style={{ width: "100%", height: 6, borderRadius: 3, background: T.bg }}>
+                      <div
+                        style={{
+                          width: `${cat.utilization}%`,
+                          height: "100%",
+                          borderRadius: 3,
+                          background: cat.color,
+                          transition: "width 600ms ease",
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Plan Distribution Chart */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <div>
+                  <h3 style={cardTitleStyle}>Plan Distribution by Department</h3>
+                  <p style={cardSubtitleStyle}>Breakdown of employee plans across departments</p>
+                </div>
+              </div>
+              <div style={{ width: "100%", height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={PLAN_DISTRIBUTION_DATA}
+                    layout="vertical"
+                    margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                    barSize={18}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke={T.border} horizontal={false} />
+                    <XAxis
+                      type="number"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="dept"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                      width={80}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(0,0,0,0.02)" }}
+                      contentStyle={{
+                        background: T.fg,
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 8,
+                        fontSize: 12,
+                        fontFamily: T.font,
+                      }}
+                      itemStyle={{ color: "#fff" }}
+                      labelStyle={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}
+                    />
+                    <Bar dataKey="standard" name="Standard" stackId="a" fill={PLAN_META.Standard.color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="premium" name="Premium" stackId="a" fill={PLAN_META.Premium.color} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="executive" name="Executive" stackId="a" fill={PLAN_META.Executive.color} radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{ display: "flex", gap: 20, marginTop: 12, justifyContent: "center" }}>
+                {BENEFIT_PLANS.map((plan) => (
+                  <div key={plan} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: PLAN_META[plan].color }} />
+                    <span style={{ fontSize: 12, color: T.muted }}>{plan}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>}
+
+          {/* ═══ CLAIMS TAB ═════════════════════════════════════════════ */}
+          {activeTab === "Claims" && <>
+            {/* Claim Status Summary */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
+              {[
+                { label: "Total Claims", value: claimStatusCounts.total, color: T.blue, bg: T.blueBg, icon: FileText },
+                { label: "Approved", value: claimStatusCounts.approved, color: T.green, bg: T.greenBg, icon: Check },
+                { label: "Rejected", value: claimStatusCounts.rejected, color: T.red, bg: T.redBg, icon: X },
+                { label: "Pending", value: claimStatusCounts.pending, color: T.amber, bg: T.amberBg, icon: Clock },
+              ].map((stat) => (
+                <div key={stat.label} style={cardStyle}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 10,
+                        background: stat.bg,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <stat.icon size={18} style={{ color: stat.color }} />
+                    </div>
+                    <span style={{ fontSize: 13, color: T.muted, fontWeight: 500 }}>{stat.label}</span>
+                  </div>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: T.fg, fontVariantNumeric: "tabular-nums" }}>
+                    {stat.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Full-width Activity Table */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <div>
+                  <h3 style={cardTitleStyle}>All Claims Activity</h3>
+                  <p style={cardSubtitleStyle}>Complete list of recent benefit claims and approvals</p>
+                </div>
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: "transparent",
+                    border: `1px solid ${T.border}`,
+                    borderRadius: 8,
+                    padding: "6px 14px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: T.muted,
+                    fontFamily: T.font,
+                    cursor: refreshing ? "default" : "pointer",
+                    opacity: refreshing ? 0.6 : 1,
+                    transition: "background 150ms, border-color 150ms",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!refreshing) {
+                      e.currentTarget.style.background = T.bg;
+                      e.currentTarget.style.borderColor = T.mutedLight;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.borderColor = T.border;
+                  }}
+                >
+                  <RefreshCw
+                    size={13}
+                    style={{ animation: refreshing ? "spin 1s linear infinite" : "none" }}
+                  />
+                  Refresh
+                </button>
+              </div>
+
+              {filteredActivity.length === 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "48px 16px",
+                    color: T.muted,
+                    textAlign: "center",
+                  }}
+                >
+                  <FileText size={32} style={{ color: T.border, marginBottom: 12 }} />
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
+                    {query ? "No claims matching your search" : "No claims activity"}
+                  </p>
+                </div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: 13,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        {["Employee", "Benefit Type", "Amount", "Status", "Date"].map((col) => (
+                          <th
+                            key={col}
+                            style={{
+                              textAlign: "left",
+                              padding: "10px 12px",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: T.muted,
+                              borderBottom: `1px solid ${T.border}`,
+                              letterSpacing: "0.02em",
+                              textTransform: "uppercase",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredActivity.map((item, idx) => {
+                        const isApproved = item.action === "approved" || item.status === "approved";
+                        const isRejected = item.action === "rejected" || item.status === "rejected";
+                        const isPending = !isApproved && !isRejected;
+                        const statusLabel = isApproved ? "Approved" : isRejected ? "Rejected" : "Pending";
+                        const statusColor = isApproved ? T.green : isRejected ? T.red : T.amber;
+                        const statusBg = isApproved ? T.greenBg : isRejected ? T.redBg : T.amberBg;
+
+                        return (
+                          <tr
+                            key={item.claimId || idx}
+                            style={{ transition: "background 150ms", cursor: "default" }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <td
+                              style={{
+                                padding: "12px 12px",
+                                borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
+                                fontWeight: 500,
+                                color: T.fg,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div
+                                  style={{
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: "50%",
+                                    background: item.avatarColor || T.blue,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#fff",
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    flexShrink: 0,
+                                    letterSpacing: "0.5px",
+                                  }}
+                                >
+                                  {item.initials || (item.employeeName || "").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                                </div>
+                                <span>{item.employeeName}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: "12px 12px", borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none", color: T.muted }}>
+                              {item.type || item.category || "--"}
+                            </td>
+                            <td style={{ padding: "12px 12px", borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: T.fg, whiteSpace: "nowrap" }}>
+                              {item.amount || "--"}
+                            </td>
+                            <td style={{ padding: "12px 12px", borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none" }}>
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  padding: "3px 10px",
+                                  borderRadius: 100,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: statusColor,
+                                  background: statusBg,
+                                  lineHeight: "16px",
+                                }}
+                              >
+                                {isApproved && <Check size={11} />}
+                                {isRejected && <X size={11} />}
+                                {isPending && <Clock size={11} />}
+                                {statusLabel}
+                              </span>
+                            </td>
+                            <td style={{ padding: "12px 12px", borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none", color: T.muted, fontSize: 12, whiteSpace: "nowrap" }}>
+                              {item.timestamp || item.dateSubmitted || "--"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>}
+
+          {/* ═══ EMPLOYEES TAB ══════════════════════════════════════════ */}
+          {activeTab === "Employees" && <>
+            {/* Department Breakdown Table */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <div>
+                  <h3 style={cardTitleStyle}>Department Breakdown</h3>
+                  <p style={cardSubtitleStyle}>Employee counts, average CTC, and plan distribution by department</p>
+                </div>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 13,
+                    fontFamily: T.font,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      {["Department", "Employees", "Avg CTC", "Standard", "Premium", "Executive"].map((col) => (
+                        <th
+                          key={col}
+                          style={{
+                            textAlign: "left",
+                            padding: "10px 12px",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: T.muted,
+                            borderBottom: `1px solid ${T.border}`,
+                            letterSpacing: "0.02em",
+                            textTransform: "uppercase",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DEPARTMENT_DATA.map((dept, idx) => (
+                      <tr
+                        key={dept.dept}
+                        style={{ transition: "background 150ms" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none", fontWeight: 600, color: T.fg }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <Building2 size={14} style={{ color: T.muted }} />
+                            {dept.dept}
+                          </div>
+                        </td>
+                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none", fontVariantNumeric: "tabular-nums", color: T.fg }}>{dept.count}</td>
+                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none", fontVariantNumeric: "tabular-nums", color: T.fg, fontWeight: 500 }}>{dept.avgCtc}</td>
+                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none" }}>
+                          <span style={{ padding: "2px 10px", borderRadius: 100, fontSize: 11, fontWeight: 600, color: PLAN_META.Standard.color, background: PLAN_META.Standard.bgColor }}>{dept.standard}</span>
+                        </td>
+                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none" }}>
+                          <span style={{ padding: "2px 10px", borderRadius: 100, fontSize: 11, fontWeight: 600, color: PLAN_META.Premium.color, background: PLAN_META.Premium.bgColor }}>{dept.premium}</span>
+                        </td>
+                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none" }}>
+                          <span style={{ padding: "2px 10px", borderRadius: 100, fontSize: 11, fontWeight: 600, color: PLAN_META.Executive.color, background: PLAN_META.Executive.bgColor }}>{dept.executive}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Top Employees by Benefit Utilization */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <div>
+                  <h3 style={cardTitleStyle}>Top Employees by Benefit Utilization</h3>
+                  <p style={cardSubtitleStyle}>Employees with highest benefit plan usage</p>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {TOP_EMPLOYEES_BY_UTILIZATION.map((emp) => {
+                  const planColor = PLAN_META[emp.plan as BenefitPlan]?.color || T.muted;
+                  const planBg = PLAN_META[emp.plan as BenefitPlan]?.bgColor || T.bg;
+                  return (
+                    <div
+                      key={emp.name}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: 14,
+                        borderRadius: 10,
+                        border: `1px solid ${T.border}`,
+                        transition: "background 150ms",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <div
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: "50%",
+                          background: planColor,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#fff",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {emp.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: T.fg, marginBottom: 2 }}>{emp.name}</div>
+                        <div style={{ fontSize: 11, color: T.muted }}>
+                          {emp.dept}
+                          <span style={{ margin: "0 6px", color: T.border }}>|</span>
+                          <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600, color: planColor, background: planBg }}>{emp.plan}</span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: T.fg, fontVariantNumeric: "tabular-nums" }}>{emp.utilization}%</div>
+                        <div style={{ width: 60, height: 4, borderRadius: 2, background: T.bg, marginTop: 4 }}>
+                          <div style={{ width: `${emp.utilization}%`, height: "100%", borderRadius: 2, background: planColor }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>}
+
         </>
       )}
 

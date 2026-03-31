@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Save, Info, ArrowRightLeft, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 import type { CarryForwardRule, AllowanceCategory } from "../../types";
 
 const CATEGORIES: { key: AllowanceCategory; label: string }[] = [
@@ -45,11 +46,17 @@ export function CarryForwardEngine() {
         encashmentTaxable: defaultAction === "encash" ? true : r.encashmentTaxable,
       }))
     );
+    toast.success(`Applied "${ACTION_LABELS[defaultAction]}" to all categories`);
   };
 
   const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      toast.success("Carry-forward rules saved successfully");
+    } catch {
+      toast.error("Failed to save carry-forward rules");
+    }
   };
 
   return (

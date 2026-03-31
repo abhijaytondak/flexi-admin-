@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
   ChevronDown, ChevronRight, Plus, Trash2, Upload, Shield, Settings2,
-  ToggleLeft, ToggleRight, FileText, AlertCircle, X, Package
+  ToggleLeft, ToggleRight, FileText, AlertCircle, X, Package, Loader2, Save
 } from "lucide-react";
+import { toast } from "sonner";
 import * as api from "../utils/api";
 import { formatINR, parseINR } from "../utils/helpers";
 import { useSearch } from "../contexts/SearchContext";
@@ -73,6 +74,9 @@ export function PolicyEngine() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSavingAll, setIsSavingAll] = useState(false);
+  const [savingBracketId, setSavingBracketId] = useState<string | null>(null);
 
   // Add bracket form
   const [newName, setNewName] = useState("");
@@ -92,17 +96,37 @@ export function PolicyEngine() {
 
   useEffect(() => { fetchPolicy(); }, [fetchPolicy]);
 
+  // ESC key to close modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowAddModal(false);
+        setDeleteTarget(null);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const toggleExpand = (id: string) => {
     setBrackets(prev => prev.map(b => b.id === id ? { ...b, expanded: !b.expanded } : b));
   };
 
-  const toggleBenefit = (bracketId: string, idx: number, field: "enabled" | "billRequired" | "carryForward") => {
-    setBrackets(prev => prev.map(b => {
-      if (b.id !== bracketId) return b;
-      const benefits = [...b.benefits];
-      benefits[idx] = { ...benefits[idx], [field]: !benefits[idx][field] };
-      return { ...b, benefits };
-    }));
+  const toggleBenefit = async (bracketId: string, idx: number, field: "enabled" | "billRequired" | "carryForward") => {
+    const bracket = brackets.find(b => b.id === bracketId);
+    if (!bracket) return;
+    const updatedBenefits = [...bracket.benefits];
+    updatedBenefits[idx] = { ...updatedBenefits[idx], [field]: !updatedBenefits[idx][field] };
+    try {
+      await api.updateBracket(bracketId, { benefits: updatedBenefits });
+      setBrackets(prev => prev.map(b => {
+        if (b.id !== bracketId) return b;
+        return { ...b, benefits: updatedBenefits };
+      }));
+      toast.success("Bracket updated");
+    } catch (e: any) {
+      toast.error(e.message || "Operation failed");
+    }
   };
 
   const updateCap = (bracketId: string, idx: number, value: string) => {
@@ -115,36 +139,56 @@ export function PolicyEngine() {
   };
 
   const handleAddBracket = async () => {
-    if (!newName.trim() || !newRange.trim()) return;
+    if (!newRange.trim()) {
+      toast.error("Please fill required fields");
+      return;
+    }
+    if (!newName.trim()) {
+      toast.error("Please fill required fields");
+      return;
+    }
     setSaving(true);
     try {
       const res = await api.createBracket({ name: newName, range: newRange, benefitPlan: newPlan, benefits: [] });
       setBrackets(res.all?.map((b: any) => ({ ...b, expanded: false })) ?? [...brackets, { ...res.data, expanded: false }]);
       setShowAddModal(false); setNewName(""); setNewRange(""); setNewPlan("Standard");
       setSetupRequired(false);
-    } catch (e: any) { setError(e.message); }
+      toast.success("Salary bracket created");
+    } catch (e: any) { toast.error(e.message || "Operation failed"); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    setSaving(true);
+    setIsDeleting(true);
     try {
       const res = await api.deleteBracket(deleteTarget);
       setBrackets(res.data?.map((b: any) => ({ ...b, expanded: false })) ?? brackets.filter(b => b.id !== deleteTarget));
       setDeleteTarget(null);
-    } catch (e: any) { setError(e.message); }
-    finally { setSaving(false); }
+      toast.success("Bracket deleted");
+    } catch (e: any) { toast.error(e.message || "Failed to delete bracket"); }
+    finally { setIsDeleting(false); }
   };
 
   const handleSave = async (bracketId: string) => {
     const bracket = brackets.find(b => b.id === bracketId);
     if (!bracket) return;
-    setSaving(true);
+    setSavingBracketId(bracketId);
     try {
       await api.updateBracket(bracketId, { benefits: bracket.benefits });
-    } catch (e: any) { setError(e.message); }
-    finally { setSaving(false); }
+      toast.success("Bracket updated");
+    } catch (e: any) { toast.error(e.message || "Operation failed"); }
+    finally { setSavingBracketId(null); }
+  };
+
+  const handleSaveAll = async () => {
+    setIsSavingAll(true);
+    try {
+      const res = await api.savePolicy(brackets);
+      setBrackets(res.data?.map((b: any) => ({ ...b, expanded: false })) ?? brackets);
+      toast.success("Policy saved successfully");
+    } catch (e: any) { toast.error(e.message || "Operation failed"); }
+    finally { setIsSavingAll(false); }
   };
 
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,7 +196,7 @@ export function PolicyEngine() {
     if (!file) return;
     const text = await file.text();
     const lines = text.split("\n").filter(l => l.trim());
-    if (lines.length < 2) { setError("CSV must have a header row and at least one data row."); return; }
+    if (lines.length < 2) { toast.error("CSV must have a header row and at least one data row."); return; }
     const rows = lines.slice(1).map(line => {
       const [name, range, plan] = line.split(",").map(s => s.trim());
       return { name, range, benefitPlan: plan || "Standard", benefits: [] };
@@ -162,7 +206,8 @@ export function PolicyEngine() {
       const res = await api.bulkImportPolicy(rows);
       setBrackets(res.data?.map((b: any) => ({ ...b, expanded: false })) ?? brackets);
       setSetupRequired(false);
-    } catch (e: any) { setError(e.message); }
+      toast.success(`Imported ${rows.length} brackets`);
+    } catch (e: any) { toast.error(e.message || "Operation failed"); }
     finally { setSaving(false); if (fileRef.current) fileRef.current.value = ""; }
   };
 
@@ -245,6 +290,10 @@ export function PolicyEngine() {
         <div style={{ display: "flex", gap: "var(--space-3)" }}>
           <button style={btnGhost} onClick={() => fileRef.current?.click()}>
             <Upload size={16} /> Import CSV
+          </button>
+          <button style={btnGhost} onClick={handleSaveAll} disabled={isSavingAll}>
+            {isSavingAll ? <Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} /> : <Save size={16} />}
+            {isSavingAll ? "Saving..." : "Save All"}
           </button>
           <button style={btnPrimary} onClick={() => setShowAddModal(true)}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
@@ -357,10 +406,13 @@ export function PolicyEngine() {
                   </div>
                 )}
                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-4)" }}>
-                  <button style={btnPrimary} onClick={() => handleSave(bracket.id)} disabled={saving}
+                  <button style={btnPrimary} onClick={() => handleSave(bracket.id)} disabled={savingBracketId === bracket.id}
                     onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
-                    <Settings2 size={14} /> {saving ? "Saving..." : "Save Changes"}
+                    {savingBracketId === bracket.id
+                      ? <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} />
+                      : <Settings2 size={14} />}
+                    {savingBracketId === bracket.id ? "Saving..." : "Save Changes"}
                   </button>
                 </div>
               </div>
@@ -412,7 +464,7 @@ export function PolicyEngine() {
                 <button style={btnPrimary} onClick={handleAddBracket} disabled={saving}
                   onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
                   onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
-                  {saving ? "Creating..." : "Create Bracket"}
+                  {saving ? <><Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} /> Creating...</> : "Create Bracket"}
                 </button>
               </div>
             </div>
@@ -434,10 +486,10 @@ export function PolicyEngine() {
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
-                  Delete Bracket
+                  Delete bracket {brackets.find(b => b.id === deleteTarget)?.range ?? ""}?
                 </h3>
                 <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
-                  This action cannot be undone. All associated benefit rules will be removed.
+                  This action cannot be undone.
                 </p>
               </div>
             </div>
@@ -445,10 +497,10 @@ export function PolicyEngine() {
               <button style={btnGhost} onClick={() => setDeleteTarget(null)}>Cancel</button>
               <button style={{
                 ...btnPrimary, backgroundColor: "var(--brand-red)",
-              }} onClick={handleDelete} disabled={saving}
+              }} onClick={handleDelete} disabled={isDeleting}
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = "#c0392b"}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-red)"}>
-                {saving ? "Deleting..." : "Delete"}
+                {isDeleting ? <><Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} /> Deleting...</> : "Confirm"}
               </button>
             </div>
           </div>
