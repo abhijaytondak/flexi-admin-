@@ -29,7 +29,7 @@ export function BandAssignmentView({ employees, onRefresh }: Props) {
   const columns: BenefitPlan[] = BENEFIT_PLANS;
 
   const grouped = useMemo(() => {
-    const map: Record<BenefitPlan, Employee[]> = Object.fromEntries(BENEFIT_PLANS.map(p => [p, []])) as Record<BenefitPlan, Employee[]>;
+    const map = Object.fromEntries(BENEFIT_PLANS.map(p => [p, [] as Employee[]])) as Record<BenefitPlan, Employee[]>;
     for (const emp of filtered) {
       map[emp.benefitPlan]?.push(emp);
     }
