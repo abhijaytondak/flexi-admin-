@@ -48,7 +48,7 @@ export function StepIndicator({ steps, currentStep }: StepIndicatorProps) {
               }
             : isActive
             ? {
-                backgroundColor: "var(--brand-navy)",
+                backgroundColor: "var(--brand-accent)",
                 color: "#fff",
                 border: "2px solid var(--brand-navy)",
                 boxShadow: "0 0 0 4px var(--brand-navy-alpha-20)",

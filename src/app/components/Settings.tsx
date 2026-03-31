@@ -12,7 +12,7 @@ const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
 const btnPrimary: CSSProperties = {
   ...font, display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
-  padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-navy)",
+  padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-accent)",
   color: "#fff", border: "none", borderRadius: "var(--rounded-md)",
   fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer",
 };
@@ -442,8 +442,8 @@ export function Settings() {
           }}>
             <button style={btnPrimary} onClick={handleSaveSection}
               disabled={saving || profileSaving}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-navy-hover)"}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-navy)"}>
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
               {saving || profileSaving ? (
                 <><Save size={14} /> Saving...</>
               ) : saved ? (

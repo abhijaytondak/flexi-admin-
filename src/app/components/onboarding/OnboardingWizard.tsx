@@ -396,7 +396,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "10px 24px",
     border: "none",
     borderRadius: "var(--rounded-md)",
-    background: "var(--brand-navy)",
+    background: "var(--brand-accent)",
     color: "#fff",
     fontSize: "var(--text-sm)",
     fontWeight: 500,

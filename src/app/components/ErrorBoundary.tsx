@@ -95,30 +95,46 @@ export class ErrorBoundary extends Component<Props, State> {
             >
               {this.state.error?.message || "An unexpected error occurred."}
             </p>
-            <button
-              onClick={this.handleReload}
-              style={{
-                padding: "var(--space-2) var(--space-5)",
-                backgroundColor: "var(--brand-navy)",
-                color: "#fff",
-                border: "none",
-                borderRadius: "var(--rounded-md)",
-                fontSize: "var(--text-sm)",
-                fontWeight: 500,
-                fontFamily: "'IBM Plex Sans', sans-serif",
-                cursor: "pointer",
-                transition: "background-color 200ms",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor =
-                  "var(--brand-navy-hover)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "var(--brand-navy)")
-              }
-            >
-              Reload Page
-            </button>
+            <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
+              <button
+                onClick={() => { window.location.href = "/"; }}
+                style={{
+                  padding: "var(--space-2) var(--space-5)",
+                  backgroundColor: "transparent",
+                  color: "var(--color-foreground)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "var(--rounded-md)",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: 500,
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  cursor: "pointer",
+                  transition: "background-color 200ms",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-card)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                Go to Dashboard
+              </button>
+              <button
+                onClick={this.handleReload}
+                style={{
+                  padding: "var(--space-2) var(--space-5)",
+                  backgroundColor: "var(--brand-accent, #E8683A)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "var(--rounded-md)",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: 500,
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  cursor: "pointer",
+                  transition: "background-color 200ms",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--brand-accent-hover, #D4582F)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--brand-accent, #E8683A)")}
+              >
+                Reload Page
+              </button>
+            </div>
           </div>
         </div>
       );

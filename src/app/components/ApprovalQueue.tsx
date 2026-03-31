@@ -12,7 +12,7 @@ const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
 const btnPrimary: CSSProperties = {
   ...font, display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
-  padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-navy)",
+  padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-accent)",
   color: "#fff", border: "none", borderRadius: "var(--rounded-md)",
   fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer",
 };
@@ -155,7 +155,7 @@ export function ApprovalQueue() {
         <div style={{ maxWidth: 480, margin: "0 auto" }}>
           <div style={{
             width: 72, height: 72, borderRadius: "var(--rounded-full)",
-            backgroundColor: "var(--brand-navy-alpha-08)", display: "flex",
+            backgroundColor: "var(--brand-accent-alpha-8)", display: "flex",
             alignItems: "center", justifyContent: "center", margin: "0 auto var(--space-5)",
           }}>
             <FileText size={32} style={{ color: "var(--brand-navy)" }} />
@@ -180,7 +180,7 @@ export function ApprovalQueue() {
       <div style={{ ...font, padding: "var(--space-8)", textAlign: "center" }}>
         <div style={{
           width: 40, height: 40, border: "3px solid var(--color-border)",
-          borderTopColor: "var(--brand-navy)", borderRadius: "50%",
+          borderTopColor: "var(--brand-accent)", borderRadius: "50%",
           animation: "spin 0.8s linear infinite", margin: "0 auto var(--space-4)",
         }} />
         <p style={{ color: "var(--color-muted-foreground)", fontSize: "var(--text-sm)" }}>Loading claims...</p>
@@ -223,7 +223,7 @@ export function ApprovalQueue() {
             ...font, padding: "var(--space-1) var(--space-4)",
             borderRadius: "var(--rounded-full)", fontSize: "var(--text-sm)", fontWeight: 500,
             border: "1px solid var(--color-border)", cursor: "pointer",
-            backgroundColor: statusFilter === s ? "var(--brand-navy)" : "transparent",
+            backgroundColor: statusFilter === s ? "var(--brand-accent)" : "transparent",
             color: statusFilter === s ? "#fff" : "var(--color-muted-foreground)",
             transition: "all 150ms",
           }}>

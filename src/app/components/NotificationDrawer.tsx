@@ -108,26 +108,33 @@ export function NotificationDrawer({
       const data = (res.data ?? []) as Notification[];
       setNotifications(data);
       onUnreadCountChange(data.filter((n) => !n.read).length);
-    } catch {
-      // silent
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
     } finally {
       setLoading(false);
     }
   }, [onUnreadCountChange]);
 
+  // Fetch on open
   useEffect(() => {
-    if (isOpen) {
-      fetchNotifications();
-    }
+    if (isOpen) fetchNotifications();
   }, [isOpen, fetchNotifications]);
+
+  // ESC key to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [isOpen, onClose]);
 
   const handleMarkAllRead = async () => {
     try {
       await api.markAllNotificationsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       onUnreadCountChange(0);
-    } catch {
-      // silent
+    } catch (err) {
+      console.error("Notification action failed:", err);
     }
   };
 
@@ -139,8 +146,8 @@ export function NotificationDrawer({
         onUnreadCountChange(next.filter((n) => !n.read).length);
         return next;
       });
-    } catch {
-      // silent
+    } catch (err) {
+      console.error("Notification action failed:", err);
     }
   };
 
@@ -177,6 +184,9 @@ export function NotificationDrawer({
 
       {/* Drawer */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Notifications"
         className="fixed top-0 right-0 z-50 flex flex-col"
         style={{
           width: 320,
@@ -253,6 +263,7 @@ export function NotificationDrawer({
             )}
             <button
               onClick={onClose}
+              aria-label="Close notifications"
               className="flex items-center justify-center transition-all duration-200"
               style={{
                 width: 32,
@@ -279,17 +290,18 @@ export function NotificationDrawer({
         {/* Content */}
         <div className="flex-1 overflow-y-auto" style={{ padding: "var(--space-3) 0" }}>
           {loading ? (
-            <div className="flex items-center justify-center" style={{ padding: "var(--space-8)" }}>
+            <div className="flex flex-col items-center justify-center gap-3" style={{ padding: "var(--space-8)" }}>
               <div
                 className="animate-spin"
                 style={{
                   width: 24,
                   height: 24,
                   border: "2px solid var(--color-border)",
-                  borderTopColor: "var(--brand-navy)",
+                  borderTopColor: "var(--brand-accent)",
                   borderRadius: "var(--rounded-full)",
                 }}
               />
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>Loading notifications...</span>
             </div>
           ) : notifications.length === 0 ? (
             <div
@@ -324,7 +336,7 @@ export function NotificationDrawer({
                   return (
                     <div
                       key={n.id}
-                      className="flex gap-3 transition-all duration-200"
+                      className="group flex gap-3 transition-all duration-200"
                       style={{
                         padding: "var(--space-3) var(--space-5)",
                         cursor: "pointer",
@@ -414,6 +426,7 @@ export function NotificationDrawer({
                           e.stopPropagation();
                           handleDismiss(n.id);
                         }}
+                        aria-label="Dismiss notification"
                         className="shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200"
                         style={{
                           width: 24,
@@ -432,7 +445,7 @@ export function NotificationDrawer({
                             "var(--brand-navy-alpha-8)";
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = "";
+                          e.currentTarget.style.opacity = "0";
                           e.currentTarget.style.backgroundColor = "transparent";
                         }}
                       >

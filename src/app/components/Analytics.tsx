@@ -103,7 +103,7 @@ export function Analytics() {
         <div style={{ maxWidth: 480, margin: "0 auto" }}>
           <div style={{
             width: 72, height: 72, borderRadius: "var(--rounded-full)",
-            backgroundColor: "var(--brand-navy-alpha-08)", display: "flex",
+            backgroundColor: "var(--brand-accent-alpha-8)", display: "flex",
             alignItems: "center", justifyContent: "center", margin: "0 auto var(--space-5)",
           }}>
             <BarChart3 size={32} style={{ color: "var(--brand-navy)" }} />
@@ -124,7 +124,7 @@ export function Analytics() {
       <div style={{ ...font, padding: "var(--space-8)", textAlign: "center" }}>
         <div style={{
           width: 40, height: 40, border: "3px solid var(--color-border)",
-          borderTopColor: "var(--brand-navy)", borderRadius: "50%",
+          borderTopColor: "var(--brand-accent)", borderRadius: "50%",
           animation: "spin 0.8s linear infinite", margin: "0 auto var(--space-4)",
         }} />
         <p style={{ color: "var(--color-muted-foreground)", fontSize: "var(--text-sm)" }}>Loading analytics...</p>

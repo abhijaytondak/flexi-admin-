@@ -12,7 +12,7 @@ const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
 const btnPrimary: CSSProperties = {
   ...font, display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
-  padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-navy)",
+  padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-accent)",
   color: "#fff", border: "none", borderRadius: "var(--rounded-md)",
   fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer",
 };
@@ -179,7 +179,7 @@ export function EmployeeDirectory() {
         <div style={{ maxWidth: 480, margin: "0 auto" }}>
           <div style={{
             width: 72, height: 72, borderRadius: "var(--rounded-full)",
-            backgroundColor: "var(--brand-navy-alpha-08)", display: "flex",
+            backgroundColor: "var(--brand-accent-alpha-8)", display: "flex",
             alignItems: "center", justifyContent: "center", margin: "0 auto var(--space-5)",
           }}>
             <Users size={32} style={{ color: "var(--brand-navy)" }} />
@@ -192,8 +192,8 @@ export function EmployeeDirectory() {
           </p>
           <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
             <button style={btnPrimary} onClick={() => setShowAddModal(true)}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-navy-hover)"}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-navy)"}>
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
               <Plus size={16} /> Add Employee
             </button>
             <button style={btnGhost} onClick={() => fileRef.current?.click()}>
@@ -211,7 +211,7 @@ export function EmployeeDirectory() {
       <div style={{ ...font, padding: "var(--space-8)", textAlign: "center" }}>
         <div style={{
           width: 40, height: 40, border: "3px solid var(--color-border)",
-          borderTopColor: "var(--brand-navy)", borderRadius: "50%",
+          borderTopColor: "var(--brand-accent)", borderRadius: "50%",
           animation: "spin 0.8s linear infinite", margin: "0 auto var(--space-4)",
         }} />
         <p style={{ color: "var(--color-muted-foreground)", fontSize: "var(--text-sm)" }}>Loading employees...</p>
@@ -246,8 +246,8 @@ export function EmployeeDirectory() {
             <Upload size={16} /> Import CSV
           </button>
           <button style={btnPrimary} onClick={() => setShowAddModal(true)}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-navy-hover)"}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-navy)"}>
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
             <Plus size={16} /> Add Employee
           </button>
         </div>
@@ -565,8 +565,8 @@ export function EmployeeDirectory() {
               <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
                 <button style={btnGhost} onClick={() => setShowAddModal(false)}>Cancel</button>
                 <button style={btnPrimary} onClick={handleAddEmployee} disabled={saving || !formName.trim() || !formDept.trim() || !formCTC.trim()}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-navy-hover)"}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-navy)"}>
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
                   {saving ? "Adding..." : "Add Employee"}
                 </button>
               </div>

@@ -598,6 +598,7 @@ function LayoutInner() {
             {/* Notification Bell */}
             <button
               onClick={() => setDrawerOpen(true)}
+              aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
               className="flex items-center justify-center transition-colors duration-150"
               style={{
                 width: 34,
@@ -644,6 +645,7 @@ function LayoutInner() {
 
         {/* ── Content Area ────────────────────────────────────────────── */}
         <main
+          role="main"
           className="flex-1"
           style={{
             padding: "var(--space-6)",

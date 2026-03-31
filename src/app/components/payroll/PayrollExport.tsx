@@ -7,7 +7,7 @@ const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
 const btnPrimary: CSSProperties = {
   ...font, display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
-  padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-navy)",
+  padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-accent)",
   color: "#fff", border: "none", borderRadius: "var(--rounded-md)",
   fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer",
 };
@@ -142,8 +142,8 @@ export function PayrollExport() {
             </span>
           </div>
           <button style={btnPrimary} onClick={handleExport}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-navy-hover)"}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-navy)"}>
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
             <Download size={16} /> Export CSV
           </button>
         </div>

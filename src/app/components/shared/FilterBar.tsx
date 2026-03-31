@@ -57,7 +57,7 @@ const pillInactive: CSSProperties = {
 
 const pillActive: CSSProperties = {
   ...pillBase,
-  backgroundColor: "var(--brand-navy)",
+  backgroundColor: "var(--brand-accent)",
   color: "#fff",
   borderColor: "var(--brand-navy)",
 };

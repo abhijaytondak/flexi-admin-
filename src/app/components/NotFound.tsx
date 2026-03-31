@@ -1,8 +1,14 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft } from "lucide-react";
 
 export function NotFound() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = "404 — Page Not Found";
+    return () => { document.title = "FlexiBenefits — HR Admin Portal"; };
+  }, []);
 
   return (
     <div
@@ -47,7 +53,7 @@ export function NotFound() {
         className="flex items-center gap-2 transition-all duration-200"
         style={{
           padding: "var(--space-2) var(--space-5)",
-          backgroundColor: "var(--brand-navy)",
+          backgroundColor: "var(--brand-accent)",
           color: "#fff",
           border: "none",
           borderRadius: "var(--rounded-md)",
@@ -57,10 +63,10 @@ export function NotFound() {
           cursor: "pointer",
         }}
         onMouseEnter={(e) =>
-          (e.currentTarget.style.backgroundColor = "var(--brand-navy-hover)")
+          (e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)")
         }
         onMouseLeave={(e) =>
-          (e.currentTarget.style.backgroundColor = "var(--brand-navy)")
+          (e.currentTarget.style.backgroundColor = "var(--brand-accent)")
         }
       >
         <ArrowLeft size={16} />
