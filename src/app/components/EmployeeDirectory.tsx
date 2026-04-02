@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
-  Plus, Upload, X, Users, AlertCircle,
+  Plus, Upload, Download, X, Users, AlertCircle,
   Mail, Phone, MapPin, Calendar, Trash2, Pencil, Save, Loader2, Check
 } from "lucide-react";
 import { toast } from "sonner";
 import * as api from "../utils/api";
 import { formatINR, parseINR, deriveBenefitPlan, deriveBracketLabel, getInitials } from "../utils/helpers";
 import { useSearch } from "../contexts/SearchContext";
-import { PLAN_META, AVATAR_COLORS, BENEFIT_PLANS, type Employee, type BenefitPlan, type Claim } from "../types";
+import { PLAN_META, AVATAR_COLORS, BENEFIT_PLANS, type Employee, type BenefitPlan, type Claim, type TaxRegime } from "../types";
 import { InvitationManager } from "./employees/InvitationManager";
 import { BandAssignmentView } from "./employees/BandAssignmentView";
 import { DEMO_EMPLOYEES, DEMO_CLAIMS } from "../utils/demoData";
@@ -120,7 +120,6 @@ export function EmployeeDirectory() {
   const [activeTab, setActiveTab] = useState<"directory" | "bands" | "invitations">("directory");
 
   // Filters
-  const [deptFilter, setDeptFilter] = useState("");
   const [planFilter, setPlanFilter] = useState("");
 
   // Modals / drawers
@@ -144,10 +143,9 @@ export function EmployeeDirectory() {
 
   // Add form
   const [formName, setFormName] = useState("");
-  const [formDept, setFormDept] = useState("");
   const [formDesignation, setFormDesignation] = useState("");
-  const [formCTC, setFormCTC] = useState("");
   const [formEmail, setFormEmail] = useState("");
+  const [formTaxRegime, setFormTaxRegime] = useState<TaxRegime>("new");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const fetchData = useCallback(async () => {
@@ -181,8 +179,6 @@ export function EmployeeDirectory() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showAddModal, selectedEmployee, showDeleteConfirm, csvPreview]);
 
-  const departments = Array.from(new Set(employees.map(e => e.department).filter(Boolean)));
-
   const closeDrawer = () => {
     setSelectedEmployee(null);
     setEditing(false);
@@ -213,32 +209,26 @@ export function EmployeeDirectory() {
   const validateAddForm = () => {
     const errs: Record<string, string> = {};
     if (!formName.trim()) errs.name = "Name is required";
-    if (!formDept.trim()) errs.dept = "Department is required";
     if (!formDesignation.trim()) errs.designation = "Designation is required";
-    if (!formCTC.trim()) errs.ctc = "CTC is required";
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
   const clearAddForm = () => {
-    setFormName(""); setFormDept(""); setFormDesignation("");
-    setFormCTC(""); setFormEmail(""); setFormErrors({});
+    setFormName(""); setFormDesignation("");
+    setFormEmail(""); setFormTaxRegime("new"); setFormErrors({});
   };
 
   const handleAddEmployee = async () => {
     if (!validateAddForm()) return;
     setSaving(true);
-    const ctcNum = parseINR(formCTC);
-    const plan = deriveBenefitPlan(ctcNum);
-    const bracket = deriveBracketLabel(ctcNum);
     const color = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
     try {
       const res = await api.createEmployee({
-        name: formName, department: formDept, designation: formDesignation,
-        salary: formatINR(ctcNum), bracket, benefitPlan: plan,
+        name: formName, designation: formDesignation,
         initials: getInitials(formName), color, status: "active",
-        email: formEmail,
-      });
+        email: formEmail, taxRegime: formTaxRegime,
+      } as any);
       setEmployees(prev => [...prev, res.data]);
       setShowAddModal(false);
       clearAddForm();
@@ -269,11 +259,11 @@ export function EmployeeDirectory() {
     setEditing(true);
     setEditFields({
       name: selectedEmployee.name,
-      department: selectedEmployee.department,
       designation: selectedEmployee.designation,
       email: selectedEmployee.email || "",
       phone: selectedEmployee.phone || "",
       location: selectedEmployee.location || "",
+      taxRegime: selectedEmployee.taxRegime || "new",
     });
   };
 
@@ -309,12 +299,13 @@ export function EmployeeDirectory() {
       headers.forEach((h, i) => { obj[h] = vals[i]; });
       const ctcNum = parseINR(obj.salary || obj.ctc || "0");
       return {
-        name: obj.name, department: obj.department || obj.dept,
+        name: obj.name,
         designation: obj.designation || obj.title || "",
         salary: formatINR(ctcNum), bracket: deriveBracketLabel(ctcNum),
         benefitPlan: deriveBenefitPlan(ctcNum),
         initials: getInitials(obj.name || ""), color: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
         status: "active" as const, email: obj.email || "",
+        taxRegime: (obj.taxregime || obj.tax_regime || "new") as TaxRegime,
       };
     });
     // Show preview instead of importing directly
@@ -339,7 +330,6 @@ export function EmployeeDirectory() {
 
   // Filter
   let filtered = employees;
-  if (deptFilter) filtered = filtered.filter(e => e.department === deptFilter);
   if (planFilter) filtered = filtered.filter(e => e.benefitPlan === planFilter);
   if (query) {
     const q = query.toLowerCase();
@@ -419,7 +409,6 @@ export function EmployeeDirectory() {
   // ─── Render helpers ────────────────────────────────────────────────────
 
   function renderAddModal() {
-    const derivedPlan = formCTC ? deriveBenefitPlan(Number(formCTC)) : null;
     return (
       <div style={overlay} onClick={() => { setShowAddModal(false); setFormErrors({}); }}>
         <div style={modalBox} onClick={e => e.stopPropagation()}>
@@ -443,34 +432,22 @@ export function EmployeeDirectory() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
               <div>
                 <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Department *
-                </label>
-                <input style={{ ...inputStyle, marginTop: "var(--space-1)", borderColor: formErrors.dept ? "var(--brand-red)" : undefined }} value={formDept}
-                  onChange={e => setFormDept(e.target.value)} placeholder="e.g. Engineering" />
-                {formErrors.dept && <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>{formErrors.dept}</p>}
-              </div>
-              <div>
-                <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   Designation *
                 </label>
                 <input style={{ ...inputStyle, marginTop: "var(--space-1)", borderColor: formErrors.designation ? "var(--brand-red)" : undefined }} value={formDesignation}
                   onChange={e => setFormDesignation(e.target.value)} placeholder="e.g. Software Engineer" />
                 {formErrors.designation && <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>{formErrors.designation}</p>}
               </div>
-            </div>
-            <div>
-              <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Annual CTC (INR) *
-              </label>
-              <input style={{ ...inputStyle, marginTop: "var(--space-1)", borderColor: formErrors.ctc ? "var(--brand-red)" : undefined }} value={formCTC}
-                onChange={e => setFormCTC(e.target.value)} placeholder="e.g. 800000" type="number" />
-              {formErrors.ctc && <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>{formErrors.ctc}</p>}
-              {derivedPlan && (
-                <div style={{ marginTop: "var(--space-2)", display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                  <span style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>Auto-detected plan:</span>
-                  <span style={planBadge(derivedPlan)}>{derivedPlan}</span>
-                </div>
-              )}
+              <div>
+                <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Tax Regime *
+                </label>
+                <select style={{ ...inputStyle, marginTop: "var(--space-1)" }} value={formTaxRegime}
+                  onChange={e => setFormTaxRegime(e.target.value as TaxRegime)}>
+                  <option value="new">New Regime</option>
+                  <option value="old">Old Regime</option>
+                </select>
+              </div>
             </div>
             <div>
               <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
@@ -514,7 +491,7 @@ export function EmployeeDirectory() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
               <thead>
                 <tr style={{ backgroundColor: "var(--color-background)", position: "sticky", top: 0 }}>
-                  {["Name", "Department", "Designation", "CTC", "Plan"].map(h => (
+                  {["Name", "Designation", "Salary", "Tax Regime", "Plan"].map(h => (
                     <th key={h} style={{ padding: "var(--space-2) var(--space-3)", textAlign: "left", fontWeight: 600, fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", borderBottom: "1px solid var(--color-border)" }}>{h}</th>
                   ))}
                 </tr>
@@ -523,9 +500,17 @@ export function EmployeeDirectory() {
                 {csvPreview.slice(0, 20).map((row, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid var(--color-border)" }}>
                     <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--color-foreground)" }}>{row.name}</td>
-                    <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--color-foreground)" }}>{row.department}</td>
                     <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--color-muted-foreground)" }}>{row.designation}</td>
                     <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--color-foreground)" }}>{row.salary}</td>
+                    <td style={{ padding: "var(--space-2) var(--space-3)" }}>
+                      <span style={{
+                        display: "inline-flex", padding: "2px 10px", borderRadius: "var(--rounded-full)",
+                        fontSize: "var(--text-xs)", fontWeight: 600,
+                        color: row.taxRegime === "old" ? "#B45309" : "#047857",
+                        backgroundColor: row.taxRegime === "old" ? "#FEF3C7" : "#D1FAE5",
+                        border: `1px solid ${row.taxRegime === "old" ? "#FCD34D" : "#6EE7B7"}`,
+                      }}>{row.taxRegime === "old" ? "Old" : "New"}</span>
+                    </td>
                     <td style={{ padding: "var(--space-2) var(--space-3)" }}><span style={planBadge(row.benefitPlan)}>{row.benefitPlan}</span></td>
                   </tr>
                 ))}
@@ -639,16 +624,18 @@ export function EmployeeDirectory() {
                           onChange={e => setEditFields(p => ({ ...p, designation: e.target.value }))}
                           placeholder="Designation"
                         />
-                        <input
+                        <select
                           style={{ ...inputStyle, fontSize: "var(--text-sm)" }}
-                          value={editFields.department || ""}
-                          onChange={e => setEditFields(p => ({ ...p, department: e.target.value }))}
-                          placeholder="Department"
-                        />
+                          value={editFields.taxRegime || "new"}
+                          onChange={e => setEditFields(p => ({ ...p, taxRegime: e.target.value as TaxRegime }))}
+                        >
+                          <option value="new">New Regime</option>
+                          <option value="old">Old Regime</option>
+                        </select>
                       </div>
                     ) : (
                       <p style={{ margin: "2px 0 0", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
-                        {emp.designation} &middot; {emp.department}
+                        {emp.designation}
                       </p>
                     )}
                     <div style={{ marginTop: "var(--space-2)" }}>
@@ -843,6 +830,18 @@ export function EmployeeDirectory() {
           </p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-3)" }}>
+          <button style={btnGhost} onClick={() => {
+            const csvContent = "name,designation,salary,email,taxRegime\nPriya Sharma,Software Engineer,800000,priya@acme.com,new\nRahul Verma,Product Manager,1200000,rahul@acme.com,old\n";
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url; link.download = "employee_import_template.csv";
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            toast.success("Template downloaded");
+          }}>
+            <Download size={16} /> Download Template
+          </button>
           <button style={btnGhost} onClick={() => fileRef.current?.click()}>
             <Upload size={16} /> Import CSV
           </button>
@@ -891,10 +890,6 @@ export function EmployeeDirectory() {
         <>
           {/* Filters */}
           <div style={{ display: "flex", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-            <select style={{ ...inputStyle, width: 200 }} value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
-              <option value="">All Departments</option>
-              {departments.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
             <select style={{ ...inputStyle, width: 160 }} value={planFilter} onChange={e => setPlanFilter(e.target.value)}>
               <option value="">All Plans</option>
               {BENEFIT_PLANS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -907,16 +902,15 @@ export function EmployeeDirectory() {
             borderRadius: "var(--rounded-lg)", overflow: "hidden",
           }}>
             <div style={{
-              display: "grid", gridTemplateColumns: "2.5fr 1.2fr 1.2fr 1fr 0.8fr 0.6fr",
+              display: "grid", gridTemplateColumns: "2.5fr 1.2fr 0.8fr 0.8fr 0.6fr",
               gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
               borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-background)",
               fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)",
               textTransform: "uppercase", letterSpacing: "0.04em",
             }}>
               <span>Employee</span>
-              <span>Department</span>
               <span>Designation</span>
-              <span>CTC</span>
+              <span>Tax Regime</span>
               <span>Plan</span>
               <span>Status</span>
             </div>
@@ -930,7 +924,7 @@ export function EmployeeDirectory() {
                 <div key={emp.id || idx}
                   onClick={() => openProfile(emp)}
                   style={{
-                    display: "grid", gridTemplateColumns: "2.5fr 1.2fr 1.2fr 1fr 0.8fr 0.6fr",
+                    display: "grid", gridTemplateColumns: "2.5fr 1.2fr 0.8fr 0.8fr 0.6fr",
                     gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
                     borderBottom: idx < filtered.length - 1 ? "1px solid var(--color-border)" : "none",
                     cursor: "pointer", transition: "background-color 150ms",
@@ -951,15 +945,18 @@ export function EmployeeDirectory() {
                       {emp.name}
                     </span>
                   </div>
-                  <span style={{ fontSize: "var(--text-sm)", color: "var(--color-foreground)", display: "flex", alignItems: "center" }}>
-                    {emp.department}
-                  </span>
                   <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center" }}>
                     {emp.designation}
                   </span>
-                  <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)", display: "flex", alignItems: "center" }}>
-                    {emp.salary}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <span style={{
+                      display: "inline-flex", padding: "2px 10px", borderRadius: "var(--rounded-full)",
+                      fontSize: "var(--text-xs)", fontWeight: 600,
+                      color: emp.taxRegime === "old" ? "#B45309" : "#047857",
+                      backgroundColor: emp.taxRegime === "old" ? "#FEF3C7" : "#D1FAE5",
+                      border: `1px solid ${emp.taxRegime === "old" ? "#FCD34D" : "#6EE7B7"}`,
+                    }}>{emp.taxRegime === "old" ? "Old" : "New"}</span>
+                  </div>
                   <div style={{ display: "flex", alignItems: "center" }}>
                     <span style={planBadge(emp.benefitPlan)}>{emp.benefitPlan}</span>
                   </div>

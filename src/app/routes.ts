@@ -6,7 +6,6 @@ import { NotFound } from "./components/NotFound";
 const Dashboard         = lazy(() => import("./components/Dashboard").then(m => ({ default: m.Dashboard })));
 const PolicyEngine      = lazy(() => import("./components/PolicyEngine").then(m => ({ default: m.PolicyEngine })));
 const ApprovalQueue     = lazy(() => import("./components/ApprovalQueue").then(m => ({ default: m.ApprovalQueue })));
-const Analytics         = lazy(() => import("./components/Analytics").then(m => ({ default: m.Analytics })));
 const EmployeeDirectory = lazy(() => import("./components/EmployeeDirectory").then(m => ({ default: m.EmployeeDirectory })));
 const Settings          = lazy(() => import("./components/Settings").then(m => ({ default: m.Settings })));
 const PayrollExport     = lazy(() => import("./components/payroll/PayrollExport").then(m => ({ default: m.PayrollExport })));
@@ -23,7 +22,6 @@ export const router = createBrowserRouter([
       { path: "policy", Component: PolicyEngine },
       { path: "approvals", Component: ApprovalQueue },
       { path: "payroll", Component: PayrollExport },
-      { path: "analytics", Component: Analytics },
       { path: "employees", Component: EmployeeDirectory },
       { path: "settings", Component: Settings },
       { path: "onboarding", Component: OnboardingWizard },

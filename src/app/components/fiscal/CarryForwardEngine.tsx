@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Save, Info, ArrowRightLeft, ChevronDown } from "lucide-react";
+import { Save, Info, ArrowRightLeft, ChevronDown, ToggleLeft, ToggleRight } from "lucide-react";
 import { toast } from "sonner";
 import type { CarryForwardRule, AllowanceCategory } from "../../types";
 
@@ -35,6 +35,7 @@ export function CarryForwardEngine() {
       encashmentTaxable: true,
     }))
   );
+  const [globalCarryForwardEnabled, setGlobalCarryForwardEnabled] = useState(true);
   const [defaultAction, setDefaultAction] = useState<CarryForwardRule["action"]>("lapse");
   const [saved, setSaved] = useState(false);
 
@@ -86,6 +87,40 @@ export function CarryForwardEngine() {
         </div>
       </div>
 
+      {/* Global Carry Forward Toggle */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: 16,
+          background: globalCarryForwardEnabled ? "#ecfdf5" : "#fef2f2",
+          border: `1px solid ${globalCarryForwardEnabled ? "#6ee7b7" : "#fca5a5"}`,
+          borderRadius: 10,
+          transition: "background 0.2s, border-color 0.2s",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
+            Carry Forward Rules
+          </span>
+          <span style={{ fontSize: 12, color: "#6b7280" }}>
+            {globalCarryForwardEnabled ? "Enabled — per-category rules apply" : "Disabled — all carry forward rules are inactive"}
+          </span>
+        </div>
+        <button
+          onClick={() => {
+            setGlobalCarryForwardEnabled((prev) => !prev);
+            toast.success(globalCarryForwardEnabled ? "Carry forward rules disabled globally" : "Carry forward rules enabled globally");
+          }}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
+        >
+          {globalCarryForwardEnabled
+            ? <ToggleRight size={28} style={{ color: "var(--brand-green, #27ae60)" }} />
+            : <ToggleLeft size={28} style={{ color: "#9ca3af" }} />}
+        </button>
+      </div>
+
       {/* Default Action + Apply All */}
       <div
         style={{
@@ -96,6 +131,9 @@ export function CarryForwardEngine() {
           background: "var(--color-card)",
           border: "1px solid var(--color-border)",
           borderRadius: 10,
+          opacity: globalCarryForwardEnabled ? 1 : 0.5,
+          pointerEvents: globalCarryForwardEnabled ? "auto" : "none",
+          transition: "opacity 0.2s",
         }}
       >
         <ArrowRightLeft size={16} style={{ color: "var(--brand-navy)" }} />
@@ -127,6 +165,9 @@ export function CarryForwardEngine() {
           border: "1px solid var(--color-border)",
           borderRadius: 12,
           overflow: "hidden",
+          opacity: globalCarryForwardEnabled ? 1 : 0.5,
+          pointerEvents: globalCarryForwardEnabled ? "auto" : "none",
+          transition: "opacity 0.2s",
         }}
       >
         <table style={{ width: "100%", borderCollapse: "collapse" }}>

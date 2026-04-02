@@ -23,15 +23,11 @@ import {
   ChevronDown,
   Pencil,
   Upload,
-  Calendar,
-  Filter,
-  LayoutGrid,
   MoreHorizontal,
   ArrowUpRight,
   ArrowDownRight,
   FileText,
   Briefcase,
-  Building2,
 } from "lucide-react";
 import {
   PieChart,
@@ -471,32 +467,7 @@ function DropdownSelector({ value, options }: { value: string; options?: string[
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Fiscal year date range helper
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-const MONTH_NAMES = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December",
-];
-
-function getFiscalYearRange(fiscalYearStart: string) {
-  const monthIdx = MONTH_NAMES.findIndex(
-    (m) => m.toLowerCase() === (fiscalYearStart || "april").toLowerCase()
-  );
-  const startMonth = monthIdx >= 0 ? monthIdx : 3; // default April
-  const now = new Date();
-  let startYear = now.getFullYear();
-  // If we haven't reached the FY start month yet this calendar year, FY started last year
-  if (now.getMonth() < startMonth) startYear -= 1;
-  const start = new Date(startYear, startMonth, 1);
-  const end = new Date(startYear + 1, startMonth, 0); // last day of month before next FY start
-  const fmt = (d: Date) =>
-    `${d.toLocaleString("en-US", { month: "short" })} ${d.getDate()}, ${d.getFullYear()}`;
-  return `${fmt(start)} - ${fmt(end)}`;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   Static data for Benefits / Claims / Employees tabs
+   Static data for Benefits / Claims tabs
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const BENEFIT_CATEGORIES = [
@@ -508,25 +479,6 @@ const BENEFIT_CATEGORIES = [
   { name: "Gadget Allowance", limit: "20,000/yr", utilization: 28, color: "#1ABC9C" },
 ];
 
-const DEPARTMENT_DATA = [
-  { dept: "Engineering", count: 135, avgCtc: "12,40,000", associate: 18, seniorAssociate: 32, manager: 38, seniorManager: 25, avp: 14, vp: 8 },
-  { dept: "Sales", count: 97, avgCtc: "9,80,000", associate: 15, seniorAssociate: 26, manager: 28, seniorManager: 16, avp: 8, vp: 4 },
-  { dept: "Marketing", count: 64, avgCtc: "10,20,000", associate: 10, seniorAssociate: 18, manager: 16, seniorManager: 12, avp: 5, vp: 3 },
-  { dept: "Operations", count: 63, avgCtc: "7,50,000", associate: 14, seniorAssociate: 20, manager: 15, seniorManager: 8, avp: 4, vp: 2 },
-  { dept: "Finance", count: 48, avgCtc: "11,00,000", associate: 8, seniorAssociate: 12, manager: 12, seniorManager: 9, avp: 4, vp: 3 },
-  { dept: "HR", count: 32, avgCtc: "9,20,000", associate: 6, seniorAssociate: 10, manager: 8, seniorManager: 5, avp: 2, vp: 1 },
-];
-
-const TOP_EMPLOYEES_BY_UTILIZATION = [
-  { name: "Rahul Sharma", dept: "Engineering", plan: "VP", utilization: 94 },
-  { name: "Priya Patel", dept: "Marketing", plan: "Manager", utilization: 91 },
-  { name: "Amit Kumar", dept: "Sales", plan: "AVP", utilization: 88 },
-  { name: "Sneha Reddy", dept: "Finance", plan: "Senior Manager", utilization: 86 },
-  { name: "Vikram Singh", dept: "Operations", plan: "Senior Associate", utilization: 84 },
-  { name: "Anita Desai", dept: "HR", plan: "Manager", utilization: 82 },
-  { name: "Karthik Nair", dept: "Engineering", plan: "Senior Manager", utilization: 80 },
-  { name: "Meena Iyer", dept: "Sales", plan: "Associate", utilization: 78 },
-];
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Dashboard — main export
@@ -547,7 +499,7 @@ export function Dashboard() {
   const [planDistribution, setPlanDistribution] = useState<any>(null);
   const [showAvatarEditor, setShowAvatarEditor] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"Overview" | "Benefits" | "Claims" | "Employees">("Overview");
+  const [activeTab, setActiveTab] = useState<"Overview" | "Benefits" | "Claims">("Overview");
 
   /* ─── Fetch ─────────────────────────────────────────────────────────── */
   const fetchDashboard = useCallback(async () => {
@@ -594,12 +546,6 @@ export function Dashboard() {
       toast.error(err?.message || "Failed to update avatar");
     }
   };
-
-  /* ─── Fiscal year date range ─────────────────────────────────────────── */
-  const fiscalDateRange = useMemo(
-    () => getFiscalYearRange(profile.fiscalYearStart),
-    [profile.fiscalYearStart]
-  );
 
   /* ─── Filter activity by search ─────────────────────────────────────── */
   const filteredActivity = recentActivity.filter((item) => {
@@ -747,7 +693,7 @@ export function Dashboard() {
     },
   ];
 
-  const tabs = ["Overview", "Benefits", "Claims", "Employees"] as const;
+  const tabs = ["Overview", "Benefits", "Claims"] as const;
 
   /* ═══════════════════════════════════════════════════════════════════════
      RENDER
@@ -786,75 +732,6 @@ export function Dashboard() {
             Dashboard
           </h1>
 
-          {/* Right: date range + filter + widgets */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "7px 14px",
-                background: T.card,
-                border: `1px solid ${T.border}`,
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 500,
-                color: T.fg,
-                fontFamily: T.font,
-                cursor: "pointer",
-                transition: "border-color 150ms",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = T.mutedLight)}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.border)}
-            >
-              <Calendar size={14} style={{ color: T.muted }} />
-              {fiscalDateRange}
-            </button>
-            <button
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "7px 14px",
-                background: T.card,
-                border: `1px solid ${T.border}`,
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 500,
-                color: T.muted,
-                fontFamily: T.font,
-                cursor: "pointer",
-                transition: "border-color 150ms",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = T.mutedLight)}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.border)}
-            >
-              <Filter size={14} />
-              Filter
-            </button>
-            <button
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "7px 14px",
-                background: T.card,
-                border: `1px solid ${T.border}`,
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 500,
-                color: T.muted,
-                fontFamily: T.font,
-                cursor: "pointer",
-                transition: "border-color 150ms",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = T.mutedLight)}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.border)}
-            >
-              <LayoutGrid size={14} />
-              Widgets
-            </button>
-          </div>
         </div>
 
         {/* Tab bar */}
@@ -1974,143 +1851,6 @@ export function Dashboard() {
             </div>
           </>}
 
-          {/* ═══ EMPLOYEES TAB ══════════════════════════════════════════ */}
-          {activeTab === "Employees" && <>
-            {/* Department Breakdown Table */}
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <div>
-                  <h3 style={cardTitleStyle}>Department Breakdown</h3>
-                  <p style={cardSubtitleStyle}>Employee counts, average CTC, and plan distribution by department</p>
-                </div>
-              </div>
-              <div style={{ overflowX: "auto" }}>
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: 13,
-                    fontFamily: T.font,
-                  }}
-                >
-                  <thead>
-                    <tr>
-                      {["Department", "Employees", "Avg CTC", "Associate", "Sr. Assoc.", "Manager", "Sr. Mgr.", "AVP", "VP"].map((col) => (
-                        <th
-                          key={col}
-                          style={{
-                            textAlign: "left",
-                            padding: "10px 12px",
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: T.muted,
-                            borderBottom: `1px solid ${T.border}`,
-                            letterSpacing: "0.02em",
-                            textTransform: "uppercase",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {col}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DEPARTMENT_DATA.map((dept, idx) => (
-                      <tr
-                        key={dept.dept}
-                        style={{ transition: "background 150ms" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                      >
-                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none", fontWeight: 600, color: T.fg }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <Building2 size={14} style={{ color: T.muted }} />
-                            {dept.dept}
-                          </div>
-                        </td>
-                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none", fontVariantNumeric: "tabular-nums", color: T.fg }}>{dept.count}</td>
-                        <td style={{ padding: "12px 12px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none", fontVariantNumeric: "tabular-nums", color: T.fg, fontWeight: 500 }}>{dept.avgCtc}</td>
-                        {(["associate", "seniorAssociate", "manager", "seniorManager", "avp", "vp"] as const).map((key) => {
-                          const planKey: Record<string, BenefitPlan> = { associate: "Associate", seniorAssociate: "Senior Associate", manager: "Manager", seniorManager: "Senior Manager", avp: "AVP", vp: "VP" };
-                          const meta = PLAN_META[planKey[key]];
-                          return (
-                            <td key={key} style={{ padding: "12px 8px", borderBottom: idx < DEPARTMENT_DATA.length - 1 ? `1px solid ${T.border}` : "none" }}>
-                              <span style={{ padding: "2px 8px", borderRadius: 100, fontSize: 11, fontWeight: 600, color: meta.color, background: meta.bgColor }}>{dept[key]}</span>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Top Employees by Benefit Utilization */}
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <div>
-                  <h3 style={cardTitleStyle}>Top Employees by Benefit Utilization</h3>
-                  <p style={cardSubtitleStyle}>Employees with highest benefit plan usage</p>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
-                {TOP_EMPLOYEES_BY_UTILIZATION.map((emp) => {
-                  const planColor = PLAN_META[emp.plan as BenefitPlan]?.color || T.muted;
-                  const planBg = PLAN_META[emp.plan as BenefitPlan]?.bgColor || T.bg;
-                  return (
-                    <div
-                      key={emp.name}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: 14,
-                        borderRadius: 10,
-                        border: `1px solid ${T.border}`,
-                        transition: "background 150ms",
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                    >
-                      <div
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: "50%",
-                          background: planColor,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#fff",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {emp.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: T.fg, marginBottom: 2 }}>{emp.name}</div>
-                        <div style={{ fontSize: 11, color: T.muted }}>
-                          {emp.dept}
-                          <span style={{ margin: "0 6px", color: T.border }}>|</span>
-                          <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600, color: planColor, background: planBg }}>{emp.plan}</span>
-                        </div>
-                      </div>
-                      <div style={{ textAlign: "right", flexShrink: 0 }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: T.fg, fontVariantNumeric: "tabular-nums" }}>{emp.utilization}%</div>
-                        <div style={{ width: 60, height: 4, borderRadius: 2, background: T.bg, marginTop: 4 }}>
-                          <div style={{ width: `${emp.utilization}%`, height: "100%", borderRadius: 2, background: planColor }} />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </>}
 
         </>
       )}

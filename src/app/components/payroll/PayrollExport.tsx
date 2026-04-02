@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo, type CSSProperties } from "react";
-import { Download, Calendar, DollarSign, Users, FileText, BarChart3, X } from "lucide-react";
+import { useState, useCallback, useMemo, useRef, useEffect, type CSSProperties } from "react";
+import { Download, Calendar, DollarSign, Users, FileText, BarChart3, X, ChevronDown, Lock, CheckCircle, Circle } from "lucide-react";
 import { formatINR, downloadFile } from "../../utils/helpers";
 import { PLAN_META, type BenefitPlan } from "../../types";
 import { StatCard } from "../shared/StatCard";
@@ -26,6 +26,27 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+type ExportFormat = "csv" | "pdf" | "excel";
+type CycleScope = "current" | "all" | string; // string for specific month names
+
+/** Get cycle status based on month relative to current date */
+function getCycleStatus(month: string): "open" | "locked" | "exported" {
+  const now = new Date();
+  const idx = MONTHS.indexOf(month);
+  const currentMonth = now.getMonth();
+  if (idx === currentMonth) return "open";
+  if (idx < currentMonth) {
+    // Simulate: months more than 2 months ago are "exported", others "locked"
+    return currentMonth - idx > 2 ? "exported" : "locked";
+  }
+  return "open"; // future months
+}
+
+const cycleStatusConfig = {
+  open: { label: "Open", color: "#16A34A", icon: Circle },
+  locked: { label: "Locked", color: "#D97706", icon: Lock },
+  exported: { label: "Exported", color: "#6B7280", icon: CheckCircle },
+} as const;
 
 interface MockRow {
   employeeId: string;
@@ -87,6 +108,21 @@ export function PayrollExport() {
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
   const [selectedYear] = useState(now.getFullYear());
   const [selectedRow, setSelectedRow] = useState<MockRow | null>(null);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("csv");
+  const [cycleScope, setCycleScope] = useState<CycleScope>("current");
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setShowExportDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Filter data by selected cycle
   const filteredData = useMemo(() => getDataForMonth(selectedMonth), [selectedMonth]);
@@ -114,26 +150,55 @@ export function PayrollExport() {
   };
   const grandTotal = colTotals.food + colTotals.fuel + colTotals.comm + colTotals.profPursuit + colTotals.gadget;
 
+  /** Gather data rows based on the selected cycle scope */
+  const getExportData = useCallback((): { data: MockRow[]; label: string } => {
+    if (cycleScope === "all") {
+      const allData: MockRow[] = [];
+      const currentMonthIdx = now.getMonth();
+      for (let i = 0; i <= currentMonthIdx; i++) {
+        allData.push(...getDataForMonth(MONTHS[i]));
+      }
+      return { data: allData, label: "all_cycles" };
+    }
+    const month = cycleScope === "current" ? selectedMonth : cycleScope;
+    return { data: getDataForMonth(month), label: month };
+  }, [cycleScope, selectedMonth, now]);
+
+  const buildCsvContent = useCallback((data: MockRow[]): string => {
+    const headers = ["Employee ID", "Name", "Department", "Band", "Food", "Fuel", "Communication", "Education", "Health", "Total Claims", "Total Amount"];
+    const rows = data.map(r => {
+      const claimsCount = [r.food, r.fuel, r.comm, r.profPursuit, r.gadget].filter(v => v > 0).length;
+      return [r.employeeId, `"${r.name}"`, r.dept, r.band, r.food, r.fuel, r.comm, r.profPursuit, r.gadget, claimsCount, total(r)].join(",");
+    });
+    const cFood = data.reduce((s, r) => s + r.food, 0);
+    const cFuel = data.reduce((s, r) => s + r.fuel, 0);
+    const cComm = data.reduce((s, r) => s + r.comm, 0);
+    const cProf = data.reduce((s, r) => s + r.profPursuit, 0);
+    const cGadget = data.reduce((s, r) => s + r.gadget, 0);
+    const cTotal = cFood + cFuel + cComm + cProf + cGadget;
+    const totalClaimsSum = data.reduce((s, r) => s + [r.food, r.fuel, r.comm, r.profPursuit, r.gadget].filter(v => v > 0).length, 0);
+    const totalsRow = ["", "TOTALS", "", "", cFood, cFuel, cComm, cProf, cGadget, totalClaimsSum, cTotal].join(",");
+    return [headers.join(","), ...rows, totalsRow].join("\n");
+  }, []);
+
   const handleExport = useCallback(() => {
     try {
-      if (filteredData.length === 0) {
-        toast.error("Failed to generate report");
+      const { data, label } = getExportData();
+      if (data.length === 0) {
+        toast.error("No data available for the selected cycle");
         return;
       }
-      const headers = ["Employee ID", "Name", "Department", "Band", "Food", "Fuel", "Communication", "Education", "Health", "Total Claims", "Total Amount"];
-      const rows = filteredData.map(r => {
-        const claimsCount = [r.food, r.fuel, r.comm, r.profPursuit, r.gadget].filter(v => v > 0).length;
-        return [r.employeeId, `"${r.name}"`, r.dept, r.band, r.food, r.fuel, r.comm, r.profPursuit, r.gadget, claimsCount, total(r)].join(",");
-      });
-      const totalClaimsSum = filteredData.reduce((s, r) => s + [r.food, r.fuel, r.comm, r.profPursuit, r.gadget].filter(v => v > 0).length, 0);
-      const totalsRow = ["", "TOTALS", "", "", colTotals.food, colTotals.fuel, colTotals.comm, colTotals.profPursuit, colTotals.gadget, totalClaimsSum, grandTotal].join(",");
-      const csv = [headers.join(","), ...rows, totalsRow].join("\n");
-      downloadFile(csv, `payroll_${selectedMonth}_${selectedYear}.csv`);
-      toast.success("Payroll report downloaded");
+      const content = buildCsvContent(data);
+      const formatExt = exportFormat === "excel" ? "xlsx" : exportFormat;
+      const mimeType = exportFormat === "pdf" ? "application/pdf" : exportFormat === "excel" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv";
+      // For PDF/Excel, we still export CSV content with the appropriate extension as a simulation
+      downloadFile(content, `payroll_${label}_${selectedYear}.${formatExt}`, mimeType);
+      toast.success(`Payroll report downloaded as ${formatExt.toUpperCase()}`);
+      setShowExportDropdown(false);
     } catch {
       toast.error("Failed to generate report");
     }
-  }, [selectedMonth, selectedYear, filteredData, colTotals, grandTotal]);
+  }, [selectedYear, getExportData, buildCsvContent, exportFormat]);
 
   const thStyle: CSSProperties = {
     textAlign: "left", padding: "var(--space-3) var(--space-3)",
@@ -177,11 +242,100 @@ export function PayrollExport() {
               {selectedYear}
             </span>
           </div>
-          <button style={btnPrimary} onClick={handleExport}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
-            <Download size={16} /> Export CSV
-          </button>
+          <div ref={exportDropdownRef} style={{ position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <button style={{ ...btnPrimary, borderTopRightRadius: 0, borderBottomRightRadius: 0 }} onClick={handleExport}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
+                <Download size={16} /> Export {exportFormat.toUpperCase()}
+              </button>
+              <button
+                style={{ ...btnPrimary, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeft: "1px solid rgba(255,255,255,0.2)", padding: "var(--space-2) var(--space-2)" }}
+                onClick={() => setShowExportDropdown(v => !v)}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
+                <ChevronDown size={16} />
+              </button>
+            </div>
+
+            {showExportDropdown && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 100,
+                width: 280, backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)",
+                borderRadius: "var(--rounded-lg)", boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                padding: "var(--space-4)", ...font,
+              }}>
+                {/* Export Format */}
+                <div style={{ marginBottom: "var(--space-4)" }}>
+                  <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "var(--space-2)" }}>
+                    Format
+                  </label>
+                  <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                    {(["csv", "pdf", "excel"] as ExportFormat[]).map(fmt => (
+                      <label key={fmt} style={{
+                        display: "flex", alignItems: "center", gap: 4, fontSize: "var(--text-sm)",
+                        cursor: "pointer", padding: "4px 10px", borderRadius: "var(--rounded-md)",
+                        border: exportFormat === fmt ? "1px solid var(--brand-accent)" : "1px solid var(--color-border)",
+                        backgroundColor: exportFormat === fmt ? "var(--brand-accent-alpha-08, rgba(37,99,235,0.08))" : "transparent",
+                        color: exportFormat === fmt ? "var(--brand-accent)" : "var(--color-foreground)",
+                        fontWeight: exportFormat === fmt ? 600 : 400,
+                      }}>
+                        <input type="radio" name="exportFormat" value={fmt} checked={exportFormat === fmt}
+                          onChange={() => setExportFormat(fmt)} style={{ display: "none" }} />
+                        {fmt.toUpperCase()}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cycle Scope */}
+                <div style={{ marginBottom: "var(--space-4)" }}>
+                  <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "var(--space-2)" }}>
+                    Cycle
+                  </label>
+                  <select style={{ ...inputStyle, width: "100%" }} value={cycleScope}
+                    onChange={e => setCycleScope(e.target.value)}>
+                    <option value="current">Current Month ({selectedMonth})</option>
+                    <option value="all">All Cycles (YTD)</option>
+                    <optgroup label="Past Months">
+                      {MONTHS.slice(0, now.getMonth() + 1).map(m => {
+                        const status = getCycleStatus(m);
+                        const cfg = cycleStatusConfig[status];
+                        return (
+                          <option key={m} value={m}>
+                            {m} - {cfg.label}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  </select>
+                </div>
+
+                {/* Cycle status legend */}
+                <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-2) var(--space-3)", backgroundColor: "var(--color-background)", borderRadius: "var(--rounded-md)" }}>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", marginBottom: "var(--space-1)", fontWeight: 600 }}>Cycle Status</div>
+                  <div style={{ display: "flex", gap: "var(--space-3)" }}>
+                    {(["open", "locked", "exported"] as const).map(status => {
+                      const cfg = cycleStatusConfig[status];
+                      const Icon = cfg.icon;
+                      return (
+                        <div key={status} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "var(--text-xs)", color: cfg.color }}>
+                          <Icon size={12} /> {cfg.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Export button */}
+                <button style={{ ...btnPrimary, width: "100%", justifyContent: "center" }} onClick={handleExport}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
+                  <Download size={16} /> Download {exportFormat.toUpperCase()}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -334,7 +488,7 @@ export function PayrollExport() {
         marginTop: "var(--space-4)", fontSize: "var(--text-xs)",
         color: "var(--color-muted-foreground)", textAlign: "center",
       }}>
-        Payroll data for {selectedMonth} {selectedYear}. Export as CSV for processing in your payroll system.
+        Payroll data for {selectedMonth} {selectedYear}. Export as CSV, PDF, or Excel for processing in your payroll system.
       </p>
 
       {/* Employee Detail Drawer */}

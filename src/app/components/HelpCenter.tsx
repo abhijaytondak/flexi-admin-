@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type CSSProperties } from "react";
+import { useNavigate } from "react-router";
 import {
   Search,
   Rocket,
@@ -9,6 +10,7 @@ import {
   Mail,
   Phone,
   Ticket,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,21 +30,29 @@ const QUICK_LINKS = [
     title: "Getting Started",
     icon: Rocket,
     description: "Set up your organization, import employees, configure benefits",
+    link: "/onboarding",
+    linkLabel: "Go to Onboarding",
   },
   {
     title: "Managing Claims",
     icon: ClipboardCheck,
     description: "Approve, reject, and track employee benefit claims",
+    link: "/approvals",
+    linkLabel: "Go to Approval Queue",
   },
   {
     title: "Payroll Export",
     icon: Download,
     description: "Generate and download monthly payroll reports",
+    link: "/payroll",
+    linkLabel: "Go to Payroll Export",
   },
   {
     title: "Policy Configuration",
     icon: Settings,
     description: "Configure salary bands, allowances, and limits",
+    link: "/policy",
+    linkLabel: "Go to Policy Engine",
   },
 ] as const;
 
@@ -181,6 +191,7 @@ function AccordionItem({
 /* ─── HelpCenter Component ─────────────────────────────────────────────── */
 
 export function HelpCenter() {
+  const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -285,16 +296,22 @@ export function HelpCenter() {
                   key={link.title}
                   style={{
                     ...card,
-                    cursor: "default",
-                    transition: "box-shadow 200ms ease",
+                    cursor: "pointer",
+                    transition: "box-shadow 200ms ease, transform 200ms ease, border-color 200ms ease",
+                    display: "flex",
+                    flexDirection: "column",
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.boxShadow =
-                      "0 2px 8px rgba(0,0,0,0.06)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.boxShadow = "none")
-                  }
+                  onClick={() => navigate(link.link)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.borderColor = "var(--brand-accent)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = "none";
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.borderColor = "#EBEBEB";
+                  }}
                 >
                   <div
                     className="flex items-center justify-center"
@@ -323,9 +340,23 @@ export function HelpCenter() {
                       fontSize: "var(--text-xs)",
                       color: "var(--sidebar-text-muted)",
                       lineHeight: 1.5,
+                      marginBottom: 12,
+                      flex: 1,
                     }}
                   >
                     {link.description}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: "var(--text-xs)",
+                      fontWeight: 600,
+                      color: "var(--brand-accent)",
+                    }}
+                  >
+                    {link.linkLabel} <ArrowRight size={12} />
                   </div>
                 </div>
               );

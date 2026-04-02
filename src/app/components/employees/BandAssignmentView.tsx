@@ -1,8 +1,10 @@
-import { useState, useMemo } from "react";
-import { Search } from "lucide-react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import * as api from "../../utils/api";
 import { PLAN_META, BENEFIT_PLANS, type Employee, type BenefitPlan } from "../../types";
+
+const PAGE_SIZE = 50;
 
 interface Props {
   employees: Employee[];
@@ -12,26 +14,64 @@ interface Props {
 const font: React.CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
 export function BandAssignmentView({ employees, onRefresh }: Props) {
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [reassigning, setReassigning] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce search input (300ms)
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchInput(value);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(value);
+      setCurrentPage(1); // Reset to page 1 on new search
+    }, 300);
+  }, []);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, []);
 
   const filtered = useMemo(() => {
-    if (!search) return employees;
-    const q = search.toLowerCase();
+    if (!debouncedSearch) return employees;
+    const q = debouncedSearch.toLowerCase();
     return employees.filter(
       e =>
         e.name.toLowerCase().includes(q) ||
         e.department?.toLowerCase().includes(q) ||
         e.email?.toLowerCase().includes(q)
     );
-  }, [employees, search]);
+  }, [employees, debouncedSearch]);
+
+  // Pagination calculations
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)), [filtered.length]);
+
+  const paginatedEmployees = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage]);
 
   const columns: BenefitPlan[] = BENEFIT_PLANS;
 
+  // Group the paginated employees for display
   const grouped = useMemo(() => {
     const map = Object.fromEntries(BENEFIT_PLANS.map(p => [p, [] as Employee[]])) as Record<BenefitPlan, Employee[]>;
-    for (const emp of filtered) {
+    for (const emp of paginatedEmployees) {
       map[emp.benefitPlan]?.push(emp);
+    }
+    return map;
+  }, [paginatedEmployees]);
+
+  // Total counts per band (across all filtered, not just current page)
+  const totalCountsPerBand = useMemo(() => {
+    const map = Object.fromEntries(BENEFIT_PLANS.map(p => [p, 0])) as Record<BenefitPlan, number>;
+    for (const emp of filtered) {
+      if (map[emp.benefitPlan] !== undefined) map[emp.benefitPlan]++;
     }
     return map;
   }, [filtered]);
@@ -65,8 +105,8 @@ export function BandAssignmentView({ employees, onRefresh }: Props) {
         <input
           type="text"
           placeholder="Search employees..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={e => handleSearchChange(e.target.value)}
           style={{
             width: "100%", padding: "8px 12px 8px 36px",
             border: "1px solid #EBEBEB", borderRadius: 12,
@@ -125,7 +165,7 @@ export function BandAssignmentView({ employees, onRefresh }: Props) {
                     borderRadius: 9999,
                   }}
                 >
-                  {list.length}
+                  {totalCountsPerBand[plan]} employee{totalCountsPerBand[plan] !== 1 ? "s" : ""}
                 </span>
               </div>
 
@@ -207,6 +247,85 @@ export function BandAssignmentView({ employees, onRefresh }: Props) {
           );
         })}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: 8, marginTop: 24, fontFamily: "'IBM Plex Sans', sans-serif",
+        }}>
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "6px 14px", border: "1px solid #EBEBEB", borderRadius: 8,
+              fontSize: 13, fontWeight: 500, cursor: currentPage === 1 ? "not-allowed" : "pointer",
+              backgroundColor: "#fff", color: currentPage === 1 ? "#D1D5DB" : "#374151",
+              opacity: currentPage === 1 ? 0.6 : 1,
+              fontFamily: "'IBM Plex Sans', sans-serif",
+            }}
+          >
+            <ChevronLeft size={14} /> Prev
+          </button>
+
+          {/* Page numbers */}
+          {(() => {
+            const pages: (number | "ellipsis")[] = [];
+            if (totalPages <= 7) {
+              for (let i = 1; i <= totalPages; i++) pages.push(i);
+            } else {
+              pages.push(1);
+              if (currentPage > 3) pages.push("ellipsis");
+              for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                pages.push(i);
+              }
+              if (currentPage < totalPages - 2) pages.push("ellipsis");
+              pages.push(totalPages);
+            }
+            return pages.map((p, idx) =>
+              p === "ellipsis" ? (
+                <span key={`ellipsis-${idx}`} style={{ padding: "0 4px", color: "#9CA3AF", fontSize: 13 }}>...</span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setCurrentPage(p)}
+                  style={{
+                    minWidth: 32, height: 32, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    border: currentPage === p ? "1px solid #3B82F6" : "1px solid #EBEBEB",
+                    borderRadius: 8, fontSize: 13, fontWeight: currentPage === p ? 700 : 400,
+                    cursor: "pointer",
+                    backgroundColor: currentPage === p ? "#EFF6FF" : "#fff",
+                    color: currentPage === p ? "#3B82F6" : "#374151",
+                    fontFamily: "'IBM Plex Sans', sans-serif",
+                  }}
+                >
+                  {p}
+                </button>
+              )
+            );
+          })()}
+
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "6px 14px", border: "1px solid #EBEBEB", borderRadius: 8,
+              fontSize: 13, fontWeight: 500, cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+              backgroundColor: "#fff", color: currentPage === totalPages ? "#D1D5DB" : "#374151",
+              opacity: currentPage === totalPages ? 0.6 : 1,
+              fontFamily: "'IBM Plex Sans', sans-serif",
+            }}
+          >
+            Next <ChevronRight size={14} />
+          </button>
+
+          <span style={{ marginLeft: 12, fontSize: 13, color: "#6B7280" }}>
+            Showing {((currentPage - 1) * PAGE_SIZE) + 1}--{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

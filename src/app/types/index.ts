@@ -4,12 +4,14 @@ export type BenefitPlan = "Associate" | "Senior Associate" | "Manager" | "Senior
 export type EmployeeStatus = "active" | "on-leave" | "inactive" | "invited";
 export type InviteStatus = "not_sent" | "sent" | "accepted";
 
+export type TaxRegime = "old" | "new";
+
 export interface Employee {
   id: string;
   name: string;
   initials: string;
   color: string;
-  department: string;
+  department?: string;
   designation: string;
   salary: string;
   bracket: string;
@@ -20,6 +22,7 @@ export interface Employee {
   location?: string;
   dateOfJoining?: string;
   inviteStatus?: InviteStatus;
+  taxRegime?: TaxRegime;
 }
 
 // ─── Claim ────────────────────────────────────────────────────────────────────
@@ -32,7 +35,7 @@ export interface Claim {
   employeeId?: string;
   initials: string;
   avatarColor: string;
-  department: string;
+  department?: string;
   benefitType: string;
   category: string;
   claimAmount: string;
@@ -46,6 +49,8 @@ export interface Claim {
   actionBy?: string;
   merchantName?: string;
   transactionId?: string;
+  salaryBand?: string;
+  approvalTag?: "auto" | "manual" | "escalated";
 }
 
 // ─── Policy ───────────────────────────────────────────────────────────────────
@@ -95,7 +100,7 @@ export interface Allowance {
 export interface SalaryBand {
   id: string;
   name: string;
-  range: string;
+  range?: string;
   benefitPlan: BenefitPlan;
   employeeCount: number;
   benefits: Allowance[];

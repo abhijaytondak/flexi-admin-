@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
   User, Palette, Bell, GitBranch, Shield, Database, Save,
-ToggleLeft, ToggleRight, Loader2
+ToggleLeft, ToggleRight, Loader2, RotateCcw
 } from "lucide-react";
 import { toast } from "sonner";
 import * as api from "../utils/api";
 import { useUserProfile, AVATAR_COLORS } from "../contexts/UserProfileContext";
 import { getInitials } from "../utils/helpers";
-import { type DashboardCards } from "../types";
+import { type DashboardCards, DEFAULT_PROFILE } from "../types";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
@@ -160,6 +160,51 @@ export function Settings() {
     }
   }, [activeTab, settings, profile, saveProfile, previewAvatarColor, updateProfile]);
 
+  const handleResetToDefaults = useCallback(async () => {
+    if (!window.confirm("Reset all profile settings to their default values? This cannot be undone.")) return;
+    setSaving(true);
+    try {
+      updateProfile({
+        name: DEFAULT_PROFILE.name,
+        initials: DEFAULT_PROFILE.initials,
+        designation: DEFAULT_PROFILE.designation,
+        email: DEFAULT_PROFILE.email,
+        employeeId: DEFAULT_PROFILE.employeeId,
+        avatarColor: DEFAULT_PROFILE.avatarColor,
+        dashboardCards: DEFAULT_PROFILE.dashboardCards,
+        fiscalYearStart: DEFAULT_PROFILE.fiscalYearStart,
+        showGreeting: DEFAULT_PROFILE.showGreeting,
+        exportFormat: DEFAULT_PROFILE.exportFormat,
+        dataRetention: DEFAULT_PROFILE.dataRetention,
+      });
+      setPreviewAvatarColor(DEFAULT_PROFILE.avatarColor);
+      await saveProfile({
+        name: DEFAULT_PROFILE.name,
+        initials: DEFAULT_PROFILE.initials,
+        designation: DEFAULT_PROFILE.designation,
+        email: DEFAULT_PROFILE.email,
+        employeeId: DEFAULT_PROFILE.employeeId,
+        avatarColor: DEFAULT_PROFILE.avatarColor,
+        dashboardCards: DEFAULT_PROFILE.dashboardCards,
+        fiscalYearStart: DEFAULT_PROFILE.fiscalYearStart,
+        showGreeting: DEFAULT_PROFILE.showGreeting,
+        exportFormat: DEFAULT_PROFILE.exportFormat,
+        dataRetention: DEFAULT_PROFILE.dataRetention,
+      });
+      setSettings(prev => ({
+        ...prev,
+        exportFormat: DEFAULT_PROFILE.exportFormat || "pdf",
+        dataRetention: DEFAULT_PROFILE.dataRetention || "2years",
+      }));
+      setDirtyTabs(new Set());
+      toast.success("Settings reset to defaults");
+    } catch {
+      toast.error("Failed to reset settings");
+    } finally {
+      setSaving(false);
+    }
+  }, [updateProfile, saveProfile]);
+
   const updateSetting = (key: string, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
     // Determine which tab this setting belongs to
@@ -228,7 +273,7 @@ export function Settings() {
 
   const renderSaveButton = () => (
     <div style={{
-      display: "flex", alignItems: "center", gap: "var(--space-3)",
+      display: "flex", alignItems: "center", justifyContent: "space-between",
       marginTop: "var(--space-6)", paddingTop: "var(--space-4)",
       borderTop: "1px solid var(--color-border)",
     }}>
@@ -244,6 +289,18 @@ export function Settings() {
         ) : (
           <><Save size={14} /> Save Changes</>
         )}
+      </button>
+      <button style={{
+        ...font, display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
+        padding: "var(--space-2) var(--space-4)", backgroundColor: "transparent",
+        color: "var(--color-muted-foreground)", border: "1px solid var(--color-border)",
+        borderRadius: "var(--rounded-md)", fontSize: "var(--text-sm)",
+        fontWeight: 500, cursor: "pointer",
+      }}
+        onClick={handleResetToDefaults}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = "#EF4444"; e.currentTarget.style.color = "#EF4444"; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.color = "var(--color-muted-foreground)"; }}>
+        <RotateCcw size={14} /> Reset to Defaults
       </button>
     </div>
   );
@@ -288,6 +345,9 @@ export function Settings() {
                 </div>
               </div>
             </div>
+
+            {/* Divider */}
+            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-2) 0 var(--space-5)" }} />
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
               {renderField("Name",
@@ -370,6 +430,9 @@ export function Settings() {
               )}
             </div>
 
+            {/* Divider */}
+            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-4) 0" }} />
+
             {renderField("Digest Frequency",
               <select style={inputStyle} value={settings.digestFrequency}
                 onChange={e => updateSetting("digestFrequency", e.target.value)}>
@@ -378,6 +441,9 @@ export function Settings() {
                 ))}
               </select>
             )}
+
+            {/* Divider */}
+            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-4) 0" }} />
 
             <div style={{ marginTop: "var(--space-4)" }}>
               <h4 style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
@@ -418,6 +484,9 @@ export function Settings() {
               </div>
             )}
 
+            {/* Divider */}
+            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-4) 0" }} />
+
             {renderField("Escalation Timer (Hours)",
               <div>
                 <input type="number" style={inputStyle} value={settings.escalationHours}
@@ -442,6 +511,9 @@ export function Settings() {
             {renderToggleRow("Two-Factor Authentication", "Require 2FA for admin sign-in",
               settings.twoFactorEnabled, () => updateSetting("twoFactorEnabled", !settings.twoFactorEnabled)
             )}
+
+            {/* Divider */}
+            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-4) 0" }} />
 
             <div style={{ marginTop: "var(--space-4)" }}>
               {renderField("Session Timeout (Minutes)",
@@ -474,6 +546,9 @@ export function Settings() {
                 <option value="excel">Excel</option>
               </select>
             )}
+
+            {/* Divider */}
+            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-4) 0" }} />
 
             {renderField("Data Retention",
               <div>
@@ -510,7 +585,7 @@ export function Settings() {
           Settings
         </h1>
         <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
-          Configure your SalarySe FlexiBenefits portal
+          Configure your SalarySe benefits portal
         </p>
       </div>
 

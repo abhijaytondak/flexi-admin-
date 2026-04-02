@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
   Check, X, Paperclip, Filter, Upload, AlertCircle,
-  Clock, CheckCircle, XCircle, FileText, Loader2
+  Clock, CheckCircle, XCircle, FileText, Loader2,
+  Download, Eye, Image
 } from "lucide-react";
 import { toast } from "sonner";
 import * as api from "../utils/api";
@@ -43,6 +44,12 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: any }> = 
   invoice_pending: { color: "#6B7A8D", bg: "#F0F2F5", icon: FileText },
   approved: { color: "var(--brand-green)", bg: "var(--brand-green-light)", icon: CheckCircle },
   rejected: { color: "var(--brand-red)", bg: "var(--brand-red-light)", icon: XCircle },
+};
+
+const APPROVAL_TAG_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  auto: { label: "Auto", color: "#27AE60", bg: "#E8F8EF" },
+  manual: { label: "Manual", color: "#E67E22", bg: "#FEF5E7" },
+  escalated: { label: "Escalated", color: "#E74C3C", bg: "#FDEDEC" },
 };
 
 function statusBadge(status: string): CSSProperties {
@@ -453,6 +460,31 @@ export function ApprovalQueue() {
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleCSVImport} />
       </div>
 
+      {/* Submission Deadline Banner */}
+      {(() => {
+        const deadline = new Date("2026-03-31");
+        const now = new Date();
+        const diffMs = deadline.getTime() - now.getTime();
+        const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+        const isUrgent = daysRemaining <= 7;
+        return (
+          <div style={{
+            display: "flex", alignItems: "center", gap: "var(--space-3)",
+            padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-4)",
+            backgroundColor: isUrgent ? "#FFF3E0" : "#FFF8E1",
+            border: `1px solid ${isUrgent ? "#FFB74D" : "#FFE082"}`,
+            borderRadius: "var(--rounded-md)",
+            animation: isUrgent ? "deadlinePulse 2s ease-in-out infinite" : "none",
+          }}>
+            <style>{`@keyframes deadlinePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }`}</style>
+            <span style={{ fontSize: "var(--text-base)" }}>&#9200;</span>
+            <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "#E65100" }}>
+              Submission deadline: March 31, 2026 — {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} remaining
+            </span>
+          </div>
+        );
+      })()}
+
       {/* Status Pills */}
       <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-4)", flexWrap: "wrap" }}>
         {STATUS_FILTERS.map(s => (
@@ -602,16 +634,50 @@ export function ApprovalQueue() {
                     <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {claim.employeeName}
                     </p>
-                    <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
-                      {claim.department}
-                    </p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", flexWrap: "wrap" }}>
+                      <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                        {claim.department}
+                      </p>
+                      {claim.salaryBand && (
+                        <span style={{
+                          display: "inline-block", padding: "0 6px", borderRadius: "var(--rounded-full)",
+                          fontSize: 10, fontWeight: 600, backgroundColor: "#EBF5FB", color: "#2980B9",
+                          lineHeight: "18px", whiteSpace: "nowrap",
+                        }}>
+                          {claim.salaryBand}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <span
-                  style={{ fontSize: "var(--text-sm)", color: "var(--color-foreground)", display: "flex", alignItems: "center" }}
+                <div
+                  style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}
                 >
-                  {claim.benefitType || claim.category}
-                </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                    <span style={{ fontSize: "var(--text-sm)", color: "var(--color-foreground)" }}>
+                      {claim.benefitType || claim.category}
+                    </span>
+                    {claim.approvalTag && (() => {
+                      const tagCfg = APPROVAL_TAG_CONFIG[claim.approvalTag];
+                      return tagCfg ? (
+                        <span style={{
+                          display: "inline-flex", alignItems: "center", gap: 3,
+                          padding: "0 6px", borderRadius: "var(--rounded-full)",
+                          fontSize: 10, fontWeight: 600, backgroundColor: tagCfg.bg, color: tagCfg.color,
+                          lineHeight: "18px", whiteSpace: "nowrap",
+                        }}>
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: tagCfg.color, display: "inline-block" }} />
+                          {tagCfg.label}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
+                  {claim.status === "rejected" && claim.receiptDescription && (
+                    <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", fontStyle: "italic", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>
+                      {claim.receiptDescription}
+                    </p>
+                  )}
+                </div>
                 <span
                   style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)", display: "flex", alignItems: "center" }}
                 >
@@ -754,18 +820,24 @@ export function ApprovalQueue() {
                     Attached Documents
                   </p>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
-                    {/* Dummy receipt image */}
+                    {/* Receipt PDF preview */}
                     <div style={{
                       border: "1px solid var(--color-border)", borderRadius: "var(--rounded-md)",
                       overflow: "hidden", backgroundColor: "var(--color-background)",
                     }}>
                       <div style={{
-                        height: 120, background: "linear-gradient(135deg, #f8f8f8 0%, #e8e8e8 100%)",
+                        height: 120, backgroundColor: "#FDF2F2",
                         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                        gap: 6, color: "var(--color-muted-foreground)",
+                        gap: 8, color: "var(--color-muted-foreground)",
                       }}>
-                        <FileText size={28} style={{ opacity: 0.5 }} />
-                        <span style={{ fontSize: 10, fontWeight: 500 }}>Receipt</span>
+                        <div style={{
+                          width: 48, height: 48, borderRadius: "var(--rounded-md)",
+                          backgroundColor: "#E74C3C", display: "flex",
+                          alignItems: "center", justifyContent: "center",
+                        }}>
+                          <FileText size={24} style={{ color: "#fff" }} />
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: "#E74C3C" }}>PDF Document</span>
                       </div>
                       <div style={{ padding: "var(--space-2) var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
                         <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>
@@ -774,9 +846,17 @@ export function ApprovalQueue() {
                         <p style={{ margin: "2px 0 0", fontSize: 10, color: "var(--color-muted-foreground)" }}>
                           PDF · 245 KB · {selectedClaim.dateSubmitted}
                         </p>
+                        <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+                          <button style={{ ...btnGhost, padding: "2px 8px", fontSize: 10, gap: 4 }} onClick={e => e.stopPropagation()}>
+                            <Eye size={10} /> View
+                          </button>
+                          <button style={{ ...btnGhost, padding: "2px 8px", fontSize: 10, gap: 4 }} onClick={e => e.stopPropagation()}>
+                            <Download size={10} /> Download
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    {/* UPI transaction proof */}
+                    {/* UPI transaction proof — PDF (PNG not accepted) */}
                     <div style={{
                       border: "1px solid var(--color-border)", borderRadius: "var(--rounded-md)",
                       overflow: "hidden", backgroundColor: "var(--color-background)",
@@ -798,14 +878,25 @@ export function ApprovalQueue() {
                       </div>
                       <div style={{ padding: "var(--space-2) var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
                         <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>
-                          UPI_transaction_proof.png
+                          UPI_transaction_proof.pdf
                         </p>
                         <p style={{ margin: "2px 0 0", fontSize: 10, color: "var(--color-muted-foreground)" }}>
-                          PNG · 128 KB · via SalarySe UPI
+                          PDF · 128 KB · via SalarySe UPI
                         </p>
+                        <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+                          <button style={{ ...btnGhost, padding: "2px 8px", fontSize: 10, gap: 4 }} onClick={e => e.stopPropagation()}>
+                            <Eye size={10} /> View Full Size
+                          </button>
+                          <button style={{ ...btnGhost, padding: "2px 8px", fontSize: 10, gap: 4 }} onClick={e => e.stopPropagation()}>
+                            <Download size={10} /> Download
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
+                  <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", fontStyle: "italic" }}>
+                    Accepted formats: PDF, JPEG only. PNG files are not accepted.
+                  </p>
                 </div>
               )}
 

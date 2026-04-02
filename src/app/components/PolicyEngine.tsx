@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
   ChevronDown, ChevronRight, Plus, Trash2, Upload, Shield, Settings2,
-  ToggleLeft, ToggleRight, AlertCircle, X, Loader2, Save
+  ToggleLeft, ToggleRight, AlertCircle, X, Loader2, Save, Info, AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import * as api from "../utils/api";
@@ -53,6 +53,23 @@ const modalBox: CSSProperties = {
   boxShadow: "var(--elevation-lg)",
 };
 
+/* ─── Recommended Thresholds (annual, INR) ──────────────────────────────────── */
+const RECOMMENDED_THRESHOLDS: Record<string, number> = {
+  "Food Allowance": 26400,
+  "Children's Education Allowance": 1200,
+  "Hostel Expenditure Allowance": 3600,
+  "Books and Periodicals": 12000,
+  "Professional Development Allowance": 24000,
+  "Phone / Internet Allowance": 12000,
+  "Health and Fitness Allowance": 15000,
+  "Uniform Allowance": 12000,
+  "Gift Allowance": 5000,
+  "Business Travel Allowance": 36000,
+  "Fuel Allowance": 21600,
+  "Vehicle Maintenance Allowance": 18000,
+  "Driver's Salary": 10800,
+};
+
 /* ─── Helpers ────────────────────────────────────────────────────────────────── */
 function planBadge(plan: BenefitPlan): CSSProperties {
   const m = PLAN_META[plan];
@@ -83,6 +100,7 @@ export function PolicyEngine() {
   const [newName, setNewName] = useState("");
   const [newRange, setNewRange] = useState("");
   const [newPlan, setNewPlan] = useState<BenefitPlan>("Associate");
+  const [includeRangeInName, setIncludeRangeInName] = useState(true);
 
   const fetchPolicy = useCallback(async () => {
     setLoading(true);
@@ -143,19 +161,20 @@ export function PolicyEngine() {
   };
 
   const handleAddBracket = async () => {
-    if (!newRange.trim()) {
-      toast.error("Please fill required fields");
-      return;
-    }
     if (!newName.trim()) {
       toast.error("Please fill required fields");
       return;
     }
+    if (includeRangeInName && !newRange.trim()) {
+      toast.error("Please provide a salary range or toggle off the range option");
+      return;
+    }
     setSaving(true);
     try {
-      const res = await api.createBracket({ name: newName, range: newRange, benefitPlan: newPlan, benefits: [] });
+      const rangeValue = includeRangeInName ? newRange : undefined;
+      const res = await api.createBracket({ name: newName, range: rangeValue ?? "", benefitPlan: newPlan, benefits: [] });
       setBrackets(res.all?.map((b: any) => ({ ...b, expanded: false })) ?? [...brackets, { ...res.data, expanded: false }]);
-      setShowAddModal(false); setNewName(""); setNewRange(""); setNewPlan("Associate");
+      setShowAddModal(false); setNewName(""); setNewRange(""); setNewPlan("Associate"); setIncludeRangeInName(true);
       setSetupRequired(false);
       toast.success("Salary bracket created");
     } catch (e: any) { toast.error(e.message || "Operation failed"); }
@@ -311,6 +330,25 @@ export function PolicyEngine() {
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleCSVImport} />
       </div>
 
+      {/* Next Cycle Notice */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 12,
+          padding: "var(--space-3) var(--space-4)",
+          background: "#eff6ff",
+          border: "1px solid #bfdbfe",
+          borderRadius: "var(--rounded-md)",
+          marginBottom: "var(--space-5)",
+        }}
+      >
+        <Info size={18} style={{ color: "#2563eb", flexShrink: 0, marginTop: 1 }} />
+        <span style={{ fontSize: "var(--text-sm)", lineHeight: 1.6, color: "#1e40af" }}>
+          Policy changes will take effect from the next payroll cycle. Existing claims in the current cycle will be processed under the previous policy.
+        </span>
+      </div>
+
       {/* Bracket Cards */}
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
         {filtered.length === 0 && (
@@ -340,7 +378,7 @@ export function PolicyEngine() {
                     <span style={planBadge(bracket.benefitPlan)}>{bracket.benefitPlan}</span>
                   </div>
                   <span style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", marginTop: 2 }}>
-                    {bracket.range} &middot; {bracket.employeeCount} employee{bracket.employeeCount !== 1 ? "s" : ""}
+                    {bracket.range ? <>{bracket.range} &middot; </> : ""}{bracket.employeeCount} employee{bracket.employeeCount !== 1 ? "s" : ""}
                   </span>
                 </div>
               </div>
@@ -390,12 +428,29 @@ export function PolicyEngine() {
                             ? <ToggleRight size={22} style={{ color: "var(--brand-green)" }} />
                             : <ToggleLeft size={22} style={{ color: "var(--color-muted-foreground)" }} />}
                         </button>
-                        <input
-                          style={{ ...inputStyle, width: 110 }}
-                          value={ben.fixedCap}
-                          onChange={e => updateCap(bracket.id, idx, e.target.value)}
-                          placeholder="e.g. 12000"
-                        />
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, position: "relative" }}>
+                          <input
+                            style={{ ...inputStyle, width: 110 }}
+                            value={ben.fixedCap}
+                            onChange={e => updateCap(bracket.id, idx, e.target.value)}
+                            placeholder="e.g. 12000"
+                          />
+                          {(() => {
+                            const threshold = RECOMMENDED_THRESHOLDS[ben.name];
+                            const capNum = parseFloat(String(ben.fixedCap).replace(/[^0-9.]/g, ""));
+                            if (threshold && !isNaN(capNum) && capNum > threshold) {
+                              return (
+                                <span
+                                  title={`Cap exceeds recommended threshold of \u20B9${threshold.toLocaleString("en-IN")}. Tax benefit may not apply beyond this limit.`}
+                                  style={{ display: "flex", alignItems: "center", cursor: "help", flexShrink: 0 }}
+                                >
+                                  <AlertTriangle size={16} style={{ color: "#d97706" }} />
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
                         <button style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
                           onClick={() => toggleBenefit(bracket.id, idx, "billRequired")}>
                           {ben.billRequired
@@ -449,11 +504,27 @@ export function PolicyEngine() {
                   onChange={e => setNewName(e.target.value)} placeholder="e.g. Junior Band" />
               </div>
               <div>
-                <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Salary Range
-                </label>
-                <input style={{ ...inputStyle, marginTop: "var(--space-1)" }} value={newRange}
-                  onChange={e => setNewRange(e.target.value)} placeholder="e.g. ₹2.5L – ₹4L" />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    Salary Range
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", cursor: "pointer" }}>
+                    <span>Include in bracket</span>
+                    <button
+                      type="button"
+                      onClick={() => setIncludeRangeInName(prev => !prev)}
+                      style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
+                    >
+                      {includeRangeInName
+                        ? <ToggleRight size={20} style={{ color: "var(--brand-green, #27ae60)" }} />
+                        : <ToggleLeft size={20} style={{ color: "var(--color-muted-foreground)" }} />}
+                    </button>
+                  </label>
+                </div>
+                {includeRangeInName && (
+                  <input style={{ ...inputStyle, marginTop: "var(--space-1)" }} value={newRange}
+                    onChange={e => setNewRange(e.target.value)} placeholder="e.g. ₹2.5L – ₹4L" />
+                )}
               </div>
               <div>
                 <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>

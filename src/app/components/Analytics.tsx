@@ -80,7 +80,7 @@ export function Analytics() {
   const avgClaimValue = approvedClaims.length > 0 ? Math.round(totalRealized / approvedClaims.length) : 0;
 
   // Department x Category heatmap
-  const allDepartments = Array.from(new Set(filteredEmployees.map(e => e.department).filter(Boolean)));
+  const allDepartments = Array.from(new Set(filteredEmployees.map(e => e.department).filter((d): d is string => Boolean(d))));
   const departments = query.trim()
     ? allDepartments.filter(dept => {
         const q = query.toLowerCase();

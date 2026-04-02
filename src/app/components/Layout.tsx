@@ -5,7 +5,6 @@ import {
   FileText,
   ClipboardCheck,
   Download,
-  BarChart3,
   Users,
   Settings,
   Search,
@@ -14,8 +13,6 @@ import {
   HelpCircle,
   Home,
   ChevronsUpDown,
-  Filter,
-  Calendar,
   Menu,
   X,
 } from "lucide-react";
@@ -56,14 +53,7 @@ const MAIN_NAV_ITEMS = [
     iconBg: "var(--icon-payroll-bg)",
     iconFg: "var(--icon-payroll-fg)",
   },
-  {
-    path: "/analytics",
-    label: "Analytics",
-    icon: BarChart3,
-    iconBg: "var(--icon-analytics-bg)",
-    iconFg: "var(--icon-analytics-fg)",
-  },
-  {
+{
     path: "/employees",
     label: "Employee Directory",
     icon: Users,
@@ -568,58 +558,6 @@ function LayoutInner() {
 
           {/* Right Side Actions */}
           <div className="flex items-center gap-2">
-            {/* Date range badge — hidden on mobile */}
-            {!isMobile && (
-              <button
-                className="flex items-center gap-1.5 transition-colors duration-150"
-                style={{
-                  padding: "5px 10px",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
-                  background: "none",
-                  cursor: "pointer",
-                  fontSize: "var(--text-sm)",
-                  color: "var(--sidebar-text-muted)",
-                  fontFamily: "'IBM Plex Sans', sans-serif",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "transparent")
-                }
-              >
-                <Calendar size={13} />
-                <span>Last 30 days</span>
-              </button>
-            )}
-
-            {/* Filter button — hidden on mobile */}
-            {!isMobile && (
-              <button
-                className="flex items-center gap-1.5 transition-colors duration-150"
-                style={{
-                  padding: "5px 10px",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
-                  background: "none",
-                  cursor: "pointer",
-                  fontSize: "var(--text-sm)",
-                  color: "var(--sidebar-text-muted)",
-                  fontFamily: "'IBM Plex Sans', sans-serif",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "transparent")
-                }
-              >
-                <Filter size={13} />
-                <span>Filter</span>
-              </button>
-            )}
-
             {/* Notification Bell */}
             <button
               onClick={() => setDrawerOpen(true)}
