@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
-  Check, X, Paperclip, Filter, Upload, AlertCircle,
+  Check, X, ChevronDown, ChevronRight, Filter, Upload, AlertCircle,
   Clock, CheckCircle, XCircle, FileText, Loader2,
-  Download, Eye, Image
+  Download, Eye
 } from "lucide-react";
 import { toast } from "sonner";
 import * as api from "../utils/api";
@@ -151,7 +151,6 @@ export function ApprovalQueue() {
   const [dateTo, setDateTo] = useState("");
   const [amountMin, setAmountMin] = useState("");
   const [amountMax, setAmountMax] = useState("");
-  const [attachmentOnly, setAttachmentOnly] = useState(false);
 
   // Detail drawer
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
@@ -170,6 +169,9 @@ export function ApprovalQueue() {
   const [showBulkRejectDialog, setShowBulkRejectDialog] = useState(false);
   const [bulkRejectReason, setBulkRejectReason] = useState("");
   const [bulkReturnToLimit, setBulkReturnToLimit] = useState(true);
+
+  // Employee accordion
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
 
   // Deep linking flag
   const [deepLinkProcessed, setDeepLinkProcessed] = useState(false);
@@ -230,9 +232,9 @@ export function ApprovalQueue() {
     if (!selectedClaim) return;
     setActionLoading(true);
     await new Promise(r => setTimeout(r, 600)); // simulate network
-    setClaims(prev => prev.map(c => c.id === selectedClaim.id ? { ...c, status: "approved" as ClaimStatus, actionNote: actionNote || "Approved by Admin", actionTimestamp: new Date().toISOString(), actionBy: "Amanda Johnson" } : c));
+    setClaims(prev => prev.map(c => c.id === selectedClaim.id ? { ...c, status: "approved" as ClaimStatus, actionNote: "Approved by Admin", actionTimestamp: new Date().toISOString(), actionBy: "Amanda Johnson" } : c));
     toast.success("Claim approved successfully");
-    setSelectedClaim(null); setActionNote("");
+    setSelectedClaim(null);
     setActionLoading(false);
   };
 
@@ -246,10 +248,10 @@ export function ApprovalQueue() {
   // Confirm rejection with reason — local state only for demo
   const confirmReject = async () => {
     if (!selectedClaim) return;
-    if (rejectReason.trim().length < 10) return;
+    if (!rejectReason) return;
     setRejectLoading(true);
     await new Promise(r => setTimeout(r, 600));
-    const fullNote = `${rejectReason}${returnToLimit ? " [Amount returned to employee limit]" : ""}${actionNote ? `\n\nAdditional notes: ${actionNote}` : ""}`;
+    const fullNote = `${rejectReason}${returnToLimit ? " [Amount returned to employee limit]" : ""}`;
     setClaims(prev => prev.map(c => c.id === selectedClaim.id ? { ...c, status: "rejected" as ClaimStatus, actionNote: fullNote, actionTimestamp: new Date().toISOString(), actionBy: "Amanda Johnson" } : c));
     toast.success("Claim rejected");
     setShowRejectDialog(false);
@@ -375,7 +377,6 @@ export function ApprovalQueue() {
   if (dateTo) filtered = filtered.filter(c => c.dateSubmitted <= dateTo);
   if (amountMin) filtered = filtered.filter(c => parseINR(c.claimAmount) >= Number(amountMin));
   if (amountMax) filtered = filtered.filter(c => parseINR(c.claimAmount) <= Number(amountMax));
-  if (attachmentOnly) filtered = filtered.filter(c => c.hasAttachment);
   if (query) {
     const q = query.toLowerCase();
     filtered = filtered.filter(c =>
@@ -549,163 +550,187 @@ export function ApprovalQueue() {
             <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)" }}>Max Amount</label>
             <input type="number" style={{ ...inputStyle, marginTop: 4 }} value={amountMax} onChange={e => setAmountMax(e.target.value)} placeholder="No limit" />
           </div>
-          <div style={{ display: "flex", alignItems: "flex-end" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)", cursor: "pointer" }}>
-              <input type="checkbox" checked={attachmentOnly} onChange={e => setAttachmentOnly(e.target.checked)} />
-              With Attachments Only
-            </label>
-          </div>
         </div>
       )}
 
-      {/* Claims Table */}
-      <div style={{
-        backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)",
-        borderRadius: "var(--rounded-lg)", overflow: "hidden",
-      }}>
-        {/* Table Header */}
-        <div style={{
-          display: "grid", gridTemplateColumns: "40px 2fr 1.2fr 1fr 1fr 0.8fr 40px",
-          gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
-          borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-background)",
-          fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)",
-          textTransform: "uppercase", letterSpacing: "0.04em",
-        }}>
-          <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <input
-              type="checkbox"
-              checked={allSelected}
-              onChange={() => toggleSelectAll(filtered)}
-              style={{ cursor: "pointer", width: 16, height: 16 }}
-            />
-          </span>
-          <span>Employee</span>
-          <span>Benefit Type</span>
-          <span>Amount</span>
-          <span>Date</span>
-          <span>Status</span>
-          <span></span>
-        </div>
+      {/* Claims — Grouped by Employee */}
+      {(() => {
+        // Group filtered claims by employeeId
+        const grouped: Record<string, Claim[]> = {};
+        filtered.forEach(c => {
+          const key = c.employeeId || c.employeeName;
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(c);
+        });
+        const employeeKeys = Object.keys(grouped);
 
-        {filtered.length === 0 ? (
-          <p style={{ textAlign: "center", padding: "var(--space-8)", color: "var(--color-muted-foreground)", fontSize: "var(--text-sm)" }}>
-            No claims match your filters.
-          </p>
-        ) : (
-          filtered.map((claim, idx) => {
-            const StatusIcon = STATUS_CONFIG[claim.status]?.icon || Clock;
-            const isSelected = selectedIds.has(claim.id);
-            return (
-              <div key={claim.id || idx}
-                onClick={() => { setSelectedClaim(claim); setActionNote(""); }}
-                style={{
-                  display: "grid", gridTemplateColumns: "40px 2fr 1.2fr 1fr 1fr 0.8fr 40px",
-                  gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
-                  borderBottom: idx < filtered.length - 1 ? "1px solid var(--color-border)" : "none",
-                  cursor: "pointer", transition: "background-color 150ms",
-                  backgroundColor: isSelected ? "var(--brand-accent-alpha-8)" : "transparent",
-                }}
-                onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--color-background)"; }}
-                onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
-              >
-                <span
-                  style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
-                  onClick={e => { e.stopPropagation(); toggleSelect(claim.id); }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleSelect(claim.id)}
-                    style={{ cursor: "pointer", width: 16, height: 16 }}
-                  />
-                </span>
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}
-                >
-                  <div style={{
-                    width: 36, height: 36, borderRadius: "var(--rounded-full)",
-                    backgroundColor: claim.avatarColor || "var(--brand-navy)",
-                    color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "var(--text-xs)", fontWeight: 600, flexShrink: 0,
-                  }}>
-                    {claim.initials || claim.employeeName?.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {claim.employeeName}
-                    </p>
-                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", flexWrap: "wrap" }}>
-                      <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
-                        {claim.department}
-                      </p>
-                      {claim.salaryBand && (
+        if (filtered.length === 0) {
+          return (
+            <p style={{ textAlign: "center", padding: "var(--space-8)", color: "var(--color-muted-foreground)", fontSize: "var(--text-sm)" }}>
+              No claims match your filters.
+            </p>
+          );
+        }
+
+        const toggleEmployee = (key: string) => {
+          setExpandedEmployees(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+          });
+        };
+
+        const toggleSelectGroup = (groupClaims: Claim[]) => {
+          const ids = groupClaims.map(c => c.id);
+          const allGroupSelected = ids.every(id => selectedIds.has(id));
+          setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (allGroupSelected) { ids.forEach(id => next.delete(id)); }
+            else { ids.forEach(id => next.add(id)); }
+            return next;
+          });
+        };
+
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+            {employeeKeys.map(empKey => {
+              const groupClaims = grouped[empKey];
+              const first = groupClaims[0];
+              const isExpanded = expandedEmployees.has(empKey);
+              const pendingCount = groupClaims.filter(c => c.status === "pending" || c.status === "submitted" || c.status === "claimed" || c.status === "invoice_pending").length;
+              const totalAmount = groupClaims.reduce((sum, c) => sum + parseINR(c.claimAmount), 0);
+              const allGroupSelected = groupClaims.every(c => selectedIds.has(c.id));
+
+              return (
+                <div key={empKey} style={{
+                  backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)",
+                  borderRadius: "var(--rounded-lg)", overflow: "hidden",
+                }}>
+                  {/* Employee Accordion Header */}
+                  <div
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "var(--space-3) var(--space-4)", cursor: "pointer",
+                      transition: "background-color 150ms",
+                    }}
+                    onClick={() => toggleEmployee(empKey)}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--color-background)"}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                      <span onClick={e => { e.stopPropagation(); toggleSelectGroup(groupClaims); }} style={{ display: "flex", alignItems: "center" }}>
+                        <input type="checkbox" checked={allGroupSelected} onChange={() => toggleSelectGroup(groupClaims)} style={{ cursor: "pointer", width: 16, height: 16 }} />
+                      </span>
+                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      <div style={{
+                        width: 36, height: 36, borderRadius: "var(--rounded-full)",
+                        backgroundColor: first.avatarColor || "var(--brand-navy)",
+                        color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "var(--text-xs)", fontWeight: 600, flexShrink: 0,
+                      }}>
+                        {first.initials || first.employeeName?.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                          {first.employeeName}
+                        </p>
+                        <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                          {first.department}
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+                      {pendingCount > 0 && (
                         <span style={{
-                          display: "inline-block", padding: "0 6px", borderRadius: "var(--rounded-full)",
-                          fontSize: 10, fontWeight: 600, backgroundColor: "#EBF5FB", color: "#2980B9",
-                          lineHeight: "18px", whiteSpace: "nowrap",
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "2px 10px", borderRadius: "var(--rounded-full)",
+                          fontSize: "var(--text-xs)", fontWeight: 600,
+                          color: "var(--brand-amber)", backgroundColor: "var(--brand-amber-light)",
                         }}>
-                          {claim.salaryBand}
+                          <Clock size={12} /> {pendingCount} pending
                         </span>
                       )}
+                      <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                        {`\u20B9${totalAmount.toLocaleString("en-IN")}`}
+                      </span>
+                      <span style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                        {groupClaims.length} claim{groupClaims.length !== 1 ? "s" : ""}
+                      </span>
                     </div>
                   </div>
-                </div>
-                <div
-                  style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                    <span style={{ fontSize: "var(--text-sm)", color: "var(--color-foreground)" }}>
-                      {claim.benefitType || claim.category}
-                    </span>
-                    {claim.approvalTag && (() => {
-                      const tagCfg = APPROVAL_TAG_CONFIG[claim.approvalTag];
-                      return tagCfg ? (
-                        <span style={{
-                          display: "inline-flex", alignItems: "center", gap: 3,
-                          padding: "0 6px", borderRadius: "var(--rounded-full)",
-                          fontSize: 10, fontWeight: 600, backgroundColor: tagCfg.bg, color: tagCfg.color,
-                          lineHeight: "18px", whiteSpace: "nowrap",
-                        }}>
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: tagCfg.color, display: "inline-block" }} />
-                          {tagCfg.label}
-                        </span>
-                      ) : null;
-                    })()}
-                  </div>
-                  {claim.status === "rejected" && claim.receiptDescription && (
-                    <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", fontStyle: "italic", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>
-                      {claim.receiptDescription}
-                    </p>
+
+                  {/* Expanded Claim Cards */}
+                  {isExpanded && (
+                    <div style={{ borderTop: "1px solid var(--color-border)" }}>
+                      {groupClaims.map((claim, idx) => {
+                        const StatusIcon = STATUS_CONFIG[claim.status]?.icon || Clock;
+                        const isSelected = selectedIds.has(claim.id);
+                        return (
+                          <div key={claim.id || idx}
+                            onClick={() => { setSelectedClaim(claim); setActionNote(""); }}
+                            style={{
+                              display: "grid", gridTemplateColumns: "40px 1.5fr 1fr 1fr 0.8fr",
+                              gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
+                              borderBottom: idx < groupClaims.length - 1 ? "1px solid var(--color-border)" : "none",
+                              cursor: "pointer", transition: "background-color 150ms",
+                              backgroundColor: isSelected ? "var(--brand-accent-alpha-8)" : "transparent",
+                            }}
+                            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--color-background)"; }}
+                            onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
+                          >
+                            <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+                              onClick={e => { e.stopPropagation(); toggleSelect(claim.id); }}>
+                              <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(claim.id)} style={{ cursor: "pointer", width: 16, height: 16 }} />
+                            </span>
+                            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                                <span style={{ fontSize: "var(--text-sm)", color: "var(--color-foreground)" }}>
+                                  {claim.benefitType || claim.category}
+                                </span>
+                                {claim.approvalTag && (() => {
+                                  const tagCfg = APPROVAL_TAG_CONFIG[claim.approvalTag];
+                                  return tagCfg ? (
+                                    <span style={{
+                                      display: "inline-flex", alignItems: "center", gap: 3,
+                                      padding: "0 6px", borderRadius: "var(--rounded-full)",
+                                      fontSize: 10, fontWeight: 600, backgroundColor: tagCfg.bg, color: tagCfg.color,
+                                      lineHeight: "18px", whiteSpace: "nowrap",
+                                    }}>
+                                      <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: tagCfg.color, display: "inline-block" }} />
+                                      {tagCfg.label}
+                                    </span>
+                                  ) : null;
+                                })()}
+                              </div>
+                              {claim.transactionId && (
+                                <span style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                                  {claim.transactionId}
+                                </span>
+                              )}
+                            </div>
+                            <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)", display: "flex", alignItems: "center" }}>
+                              {claim.claimAmount}
+                            </span>
+                            <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center" }}>
+                              {claim.dateSubmitted}
+                            </span>
+                            <div style={{ display: "flex", alignItems: "center" }}>
+                              <span style={statusBadge(claim.status)}>
+                                <StatusIcon size={12} />
+                                {claim.status}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-                <span
-                  style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)", display: "flex", alignItems: "center" }}
-                >
-                  {claim.claimAmount}
-                </span>
-                <span
-                  style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center" }}
-                >
-                  {claim.dateSubmitted}
-                </span>
-                <div
-                  style={{ display: "flex", alignItems: "center" }}
-                >
-                  <span style={statusBadge(claim.status)}>
-                    <StatusIcon size={12} />
-                    {claim.status}
-                  </span>
-                </div>
-                <div
-                  style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
-                >
-                  {claim.hasAttachment && <Paperclip size={14} style={{ color: "var(--color-muted-foreground)" }} />}
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Bulk Actions Floating Bar */}
       {someSelected && (
@@ -813,90 +838,44 @@ export function ApprovalQueue() {
                 ))}
               </div>
 
-              {/* Attached Documents */}
-              {selectedClaim.hasAttachment && (
+              {/* UPI Transaction */}
+              {selectedClaim.transactionId && (
                 <div style={{ marginBottom: "var(--space-5)" }}>
                   <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    Attached Documents
+                    Payment Proof
                   </p>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
-                    {/* Receipt PDF preview */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "var(--space-3)",
+                    padding: "var(--space-3)", backgroundColor: "#f0f0ff",
+                    border: "1px solid #d0d0f0", borderRadius: "var(--rounded-md)",
+                  }}>
                     <div style={{
-                      border: "1px solid var(--color-border)", borderRadius: "var(--rounded-md)",
-                      overflow: "hidden", backgroundColor: "var(--color-background)",
+                      width: 36, height: 36, borderRadius: "var(--rounded-full)",
+                      backgroundColor: "var(--brand-green)", display: "flex",
+                      alignItems: "center", justifyContent: "center", flexShrink: 0,
                     }}>
-                      <div style={{
-                        height: 120, backgroundColor: "#FDF2F2",
-                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                        gap: 8, color: "var(--color-muted-foreground)",
-                      }}>
-                        <div style={{
-                          width: 48, height: 48, borderRadius: "var(--rounded-md)",
-                          backgroundColor: "#E74C3C", display: "flex",
-                          alignItems: "center", justifyContent: "center",
-                        }}>
-                          <FileText size={24} style={{ color: "#fff" }} />
-                        </div>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: "#E74C3C" }}>PDF Document</span>
-                      </div>
-                      <div style={{ padding: "var(--space-2) var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
-                        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>
-                          {selectedClaim.merchantName || "Receipt"}_bill.pdf
-                        </p>
-                        <p style={{ margin: "2px 0 0", fontSize: 10, color: "var(--color-muted-foreground)" }}>
-                          PDF · 245 KB · {selectedClaim.dateSubmitted}
-                        </p>
-                        <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-                          <button style={{ ...btnGhost, padding: "2px 8px", fontSize: 10, gap: 4 }} onClick={e => e.stopPropagation()}>
-                            <Eye size={10} /> View
-                          </button>
-                          <button style={{ ...btnGhost, padding: "2px 8px", fontSize: 10, gap: 4 }} onClick={e => e.stopPropagation()}>
-                            <Download size={10} /> Download
-                          </button>
-                        </div>
-                      </div>
+                      <Check size={18} style={{ color: "#fff" }} />
                     </div>
-                    {/* UPI transaction proof — PDF (PNG not accepted) */}
-                    <div style={{
-                      border: "1px solid var(--color-border)", borderRadius: "var(--rounded-md)",
-                      overflow: "hidden", backgroundColor: "var(--color-background)",
-                    }}>
-                      <div style={{
-                        height: 120, background: "linear-gradient(135deg, #f0f0ff 0%, #e0e0f8 100%)",
-                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                        gap: 6, padding: "var(--space-3)",
-                      }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: "var(--rounded-full)",
-                          backgroundColor: "var(--brand-green)", display: "flex",
-                          alignItems: "center", justifyContent: "center",
-                        }}>
-                          <Check size={18} style={{ color: "#fff" }} />
-                        </div>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: "var(--brand-green)" }}>Payment Verified</span>
-                        <span style={{ fontSize: 9, color: "var(--color-muted-foreground)" }}>{selectedClaim.transactionId}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                        <span style={{
+                          display: "inline-flex", padding: "1px 8px", borderRadius: "var(--rounded-full)",
+                          fontSize: 10, fontWeight: 700, backgroundColor: "#5B21B6", color: "#fff",
+                        }}>UPI</span>
+                        <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                          {selectedClaim.transactionId}
+                        </span>
                       </div>
-                      <div style={{ padding: "var(--space-2) var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
-                        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>
-                          UPI_transaction_proof.pdf
-                        </p>
-                        <p style={{ margin: "2px 0 0", fontSize: 10, color: "var(--color-muted-foreground)" }}>
-                          PDF · 128 KB · via SalarySe UPI
-                        </p>
-                        <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-                          <button style={{ ...btnGhost, padding: "2px 8px", fontSize: 10, gap: 4 }} onClick={e => e.stopPropagation()}>
-                            <Eye size={10} /> View Full Size
-                          </button>
-                          <button style={{ ...btnGhost, padding: "2px 8px", fontSize: 10, gap: 4 }} onClick={e => e.stopPropagation()}>
-                            <Download size={10} /> Download
-                          </button>
-                        </div>
-                      </div>
+                      <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                        {selectedClaim.merchantName || "Merchant"} · {selectedClaim.dateSubmitted}
+                      </p>
                     </div>
                   </div>
-                  <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", fontStyle: "italic" }}>
-                    Accepted formats: PDF, JPEG only. PNG files are not accepted.
-                  </p>
+                  {selectedClaim.upiScreenshot && (
+                    <button style={{ ...btnGhost, marginTop: "var(--space-2)", gap: 6 }} onClick={e => e.stopPropagation()}>
+                      <Eye size={14} /> View UPI Screenshot
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -911,21 +890,6 @@ export function ApprovalQueue() {
                   </p>
                 </div>
               )}
-
-              {/* Status Timeline */}
-              <StatusTimeline status={selectedClaim.status} />
-
-              {/* Notes */}
-              <div style={{ marginBottom: "var(--space-5)" }}>
-                <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Action Notes
-                </label>
-                <textarea
-                  style={{ ...inputStyle, marginTop: "var(--space-2)", minHeight: 80, resize: "vertical" }}
-                  value={actionNote} onChange={e => setActionNote(e.target.value)}
-                  placeholder="Add notes for this decision..."
-                />
-              </div>
 
               {/* Previous action info */}
               {selectedClaim.actionNote && (
@@ -1006,21 +970,19 @@ export function ApprovalQueue() {
               <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                 Rejection Reason <span style={{ color: "var(--brand-red)" }}>*</span>
               </label>
-              <textarea
-                style={{
-                  ...inputStyle, marginTop: "var(--space-2)", minHeight: 100, resize: "vertical",
-                  borderColor: rejectReason.trim().length > 0 && rejectReason.trim().length < 10 ? "var(--brand-red)" : "var(--color-border)",
-                }}
+              <select
+                style={{ ...inputStyle, marginTop: "var(--space-2)" }}
                 value={rejectReason}
                 onChange={e => setRejectReason(e.target.value)}
-                placeholder="Enter rejection reason (minimum 10 characters)..."
                 autoFocus
-              />
-              {rejectReason.trim().length > 0 && rejectReason.trim().length < 10 && (
-                <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>
-                  Reason must be at least 10 characters ({rejectReason.trim().length}/10)
-                </p>
-              )}
+              >
+                <option value="">Select a reason...</option>
+                <option value="Duplicate claim">Duplicate claim</option>
+                <option value="Invalid receipt">Invalid receipt</option>
+                <option value="Exceeds limit">Exceeds limit</option>
+                <option value="Not eligible">Not eligible</option>
+                <option value="Insufficient documentation">Insufficient documentation</option>
+              </select>
             </div>
 
             <div style={{ marginBottom: "var(--space-5)" }}>
@@ -1059,11 +1021,11 @@ export function ApprovalQueue() {
               <button
                 style={{
                   ...btnPrimary, backgroundColor: "var(--brand-red)",
-                  opacity: rejectReason.trim().length < 10 || rejectLoading ? 0.5 : 1,
-                  cursor: rejectReason.trim().length < 10 || rejectLoading ? "not-allowed" : "pointer",
+                  opacity: !rejectReason || rejectLoading ? 0.5 : 1,
+                  cursor: !rejectReason || rejectLoading ? "not-allowed" : "pointer",
                 }}
                 onClick={confirmReject}
-                disabled={rejectReason.trim().length < 10 || rejectLoading}
+                disabled={!rejectReason || rejectLoading}
               >
                 {rejectLoading ? <Spinner size={16} /> : <XCircle size={16} />}
                 Confirm Rejection

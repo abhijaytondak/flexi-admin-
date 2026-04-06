@@ -15,7 +15,7 @@ export interface Employee {
   designation: string;
   salary: string;
   bracket: string;
-  benefitPlan: BenefitPlan;
+  benefitPlan?: BenefitPlan;
   status: EmployeeStatus;
   email?: string;
   phone?: string;
@@ -41,7 +41,7 @@ export interface Claim {
   claimAmount: string;
   dateSubmitted: string;
   status: ClaimStatus;
-  hasAttachment: boolean;
+  upiScreenshot?: string;
   receiptDescription: string;
   benefitPlan?: BenefitPlan;
   actionNote?: string;
@@ -100,9 +100,6 @@ export interface Allowance {
 export interface SalaryBand {
   id: string;
   name: string;
-  range?: string;
-  benefitPlan: BenefitPlan;
-  employeeCount: number;
   benefits: Allowance[];
   expanded: boolean;
 }

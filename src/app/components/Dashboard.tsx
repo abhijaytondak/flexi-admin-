@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import * as api from "../utils/api";
 import { useSearch } from "../contexts/SearchContext";
 import { useUserProfile } from "../contexts/UserProfileContext";
-import { PLAN_META, BENEFIT_PLANS, AVATAR_COLORS, type BenefitPlan } from "../types";
+import { AVATAR_COLORS } from "../types";
 import { DEMO_DASHBOARD, DEMO_EMPLOYEES } from "../utils/demoData";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { getTimeGreeting, formatINR } from "../utils/helpers";
@@ -77,21 +77,6 @@ const T = {
    Static chart data — Benefit Utilization
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const UTILIZATION_DATA = [
-  { month: "Apr", food: 32, fuel: 24, communication: 18 },
-  { month: "May", food: 35, fuel: 28, communication: 22 },
-  { month: "Jun", food: 38, fuel: 26, communication: 25 },
-  { month: "Jul", food: 42, fuel: 30, communication: 20 },
-  { month: "Aug", food: 40, fuel: 34, communication: 28 },
-  { month: "Sep", food: 45, fuel: 32, communication: 26 },
-  { month: "Oct", food: 48, fuel: 36, communication: 30 },
-  { month: "Nov", food: 50, fuel: 38, communication: 32 },
-  { month: "Dec", food: 46, fuel: 40, communication: 35 },
-  { month: "Jan", food: 52, fuel: 42, communication: 34 },
-  { month: "Feb", food: 55, fuel: 44, communication: 38 },
-  { month: "Mar", food: 58, fuel: 46, communication: 40 },
-];
-
 /* Claims Overview — daily volume over past month */
 const CLAIMS_OVERVIEW_DATA = [
   { date: "1", claims: 820 },
@@ -110,32 +95,6 @@ const CLAIMS_OVERVIEW_DATA = [
   { date: "27", claims: 11200 },
   { date: "29", claims: 12800 },
   { date: "31", claims: 14200 },
-];
-
-/* Plan Distribution by department — horizontal stacked bar */
-const PLAN_DISTRIBUTION_DATA = [
-  { dept: "Engineering", standard: 45, premium: 62, executive: 28 },
-  { dept: "Sales", standard: 38, premium: 44, executive: 15 },
-  { dept: "Marketing", standard: 22, premium: 30, executive: 12 },
-  { dept: "Operations", standard: 30, premium: 25, executive: 8 },
-  { dept: "Finance", standard: 18, premium: 20, executive: 10 },
-  { dept: "HR", standard: 12, premium: 14, executive: 6 },
-];
-
-/* Benefit Trend — actual vs target */
-const BENEFIT_TREND_DATA = [
-  { month: "Apr", actual: 12.5, target: 14 },
-  { month: "May", actual: 13.2, target: 14.5 },
-  { month: "Jun", actual: 14.8, target: 15 },
-  { month: "Jul", actual: 15.2, target: 15.5 },
-  { month: "Aug", actual: 14.6, target: 16 },
-  { month: "Sep", actual: 16.1, target: 16.5 },
-  { month: "Oct", actual: 17.4, target: 17 },
-  { month: "Nov", actual: 18.2, target: 17.5 },
-  { month: "Dec", actual: 17.8, target: 18 },
-  { month: "Jan", actual: 19.5, target: 18.5 },
-  { month: "Feb", actual: 20.1, target: 19 },
-  { month: "Mar", actual: 21.8, target: 19.5 },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -499,7 +458,6 @@ export function Dashboard() {
   const [planDistribution, setPlanDistribution] = useState<any>(null);
   const [showAvatarEditor, setShowAvatarEditor] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"Overview" | "Benefits" | "Claims">("Overview");
 
   /* ─── Fetch ─────────────────────────────────────────────────────────── */
   const fetchDashboard = useCallback(async () => {
@@ -661,10 +619,11 @@ export function Dashboard() {
      ═══════════════════════════════════════════════════════════════════════ */
   const kpiMetrics = [
     {
-      label: "Total Benefit Outgo",
-      value: kpis?.totalBenefitOutgo || "\u20B918.2Cr",
-      trend: 7.4,
-      trendUp: true,
+      label: "Pending Approvals",
+      value: kpis?.pendingApprovals ?? "33",
+      trend: null,
+      trendUp: false,
+      isWarning: true,
     },
     {
       label: "Active Employees",
@@ -672,28 +631,7 @@ export function Dashboard() {
       trend: 4.9,
       trendUp: true,
     },
-    {
-      label: "Claims Processed",
-      value: kpis?.claimsProcessed ?? "21,948",
-      trend: 11.7,
-      trendUp: true,
-    },
-    {
-      label: "Pending Approvals",
-      value: kpis?.pendingApprovals ?? "33",
-      trend: null, // displayed differently
-      trendUp: false,
-      isWarning: true,
-    },
-    {
-      label: "Avg Tax Saved",
-      value: kpis?.avgTaxSaved || "\u20B93,20,000",
-      trend: 19.4,
-      trendUp: true,
-    },
   ];
-
-  const tabs = ["Overview", "Benefits", "Claims"] as const;
 
   /* ═══════════════════════════════════════════════════════════════════════
      RENDER
@@ -734,48 +672,6 @@ export function Dashboard() {
 
         </div>
 
-        {/* Tab bar */}
-        <div
-          style={{
-            display: "flex",
-            gap: 0,
-            borderBottom: `1px solid ${T.border}`,
-            overflowX: isMobile ? "auto" : "visible",
-            WebkitOverflowScrolling: "touch" as any,
-          }}
-        >
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab;
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: "10px 20px",
-                  fontSize: 14,
-                  fontWeight: isActive ? 600 : 400,
-                  color: isActive ? T.accent : T.muted,
-                  background: "transparent",
-                  border: "none",
-                  borderBottom: isActive ? `2px solid ${T.accent}` : "2px solid transparent",
-                  cursor: "pointer",
-                  fontFamily: T.font,
-                  whiteSpace: "nowrap",
-                  transition: "color 150ms",
-                  marginBottom: -1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.color = T.fg;
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.color = T.muted;
-                }}
-              >
-                {tab}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {/* ─── SETUP REQUIRED STATE ──────────────────────────────────────── */}
@@ -844,8 +740,6 @@ export function Dashboard() {
       {!setupRequired && (
         <>
 
-          {/* ═══ OVERVIEW TAB ═══════════════════════════════════════════ */}
-          {activeTab === "Overview" && <>
           {/* ─── 2. PERFORMANCE SUMMARY ───────────────────────────────── */}
           <div style={cardStyle}>
             <div style={{ marginBottom: 20 }}>
@@ -938,117 +832,8 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* ─── 3. CHARTS ROW 1 ──────────────────────────────────────── */}
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
-            {/* Benefit Utilization — Area chart */}
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <div>
-                  <h3 style={cardTitleStyle}>Benefit Utilization</h3>
-                  <p style={cardSubtitleStyle}>Category-wise usage trends</p>
-                </div>
-                <button
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: `1px solid ${T.border}`,
-                    background: "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    color: T.muted,
-                    transition: "background 150ms",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <MoreHorizontal size={16} />
-                </button>
-              </div>
-
-              <div style={{ width: "100%", height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={UTILIZATION_DATA} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="gradFood" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={T.accent} stopOpacity={0.15} />
-                        <stop offset="95%" stopColor={T.accent} stopOpacity={0.01} />
-                      </linearGradient>
-                      <linearGradient id="gradFuel" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={T.blue} stopOpacity={0.15} />
-                        <stop offset="95%" stopColor={T.blue} stopOpacity={0.01} />
-                      </linearGradient>
-                      <linearGradient id="gradComm" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={T.green} stopOpacity={0.15} />
-                        <stop offset="95%" stopColor={T.green} stopOpacity={0.01} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={T.border} vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
-                      tickFormatter={(v) => `${v}%`}
-                      domain={[0, 60]}
-                    />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Area
-                      type="monotone"
-                      dataKey="food"
-                      name="Food"
-                      stroke={T.accent}
-                      strokeWidth={2}
-                      fill="url(#gradFood)"
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 2, fill: T.card }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="fuel"
-                      name="Fuel"
-                      stroke={T.blue}
-                      strokeWidth={2}
-                      fill="url(#gradFuel)"
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 2, fill: T.card }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="communication"
-                      name="Communication"
-                      stroke={T.green}
-                      strokeWidth={2}
-                      fill="url(#gradComm)"
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 2, fill: T.card }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Legend */}
-              <div style={{ display: "flex", gap: 20, marginTop: 12, justifyContent: "center" }}>
-                {[
-                  { label: "Food", color: T.accent },
-                  { label: "Fuel", color: T.blue },
-                  { label: "Communication", color: T.green },
-                ].map((item) => (
-                  <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: item.color }} />
-                    <span style={{ fontSize: 12, color: T.muted }}>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
+          {/* ─── 3. CLAIMS OVERVIEW CHART ──────────────────────────────── */}
+          <div>
             {/* Claims Overview — Area chart */}
             <div style={cardStyle}>
               <div style={cardHeaderStyle}>
@@ -1095,164 +880,6 @@ export function Dashboard() {
                     />
                   </AreaChart>
                 </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          {/* ─── 4. CHARTS ROW 2 ──────────────────────────────────────── */}
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
-            {/* Plan Distribution — Horizontal stacked bar */}
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <div>
-                  <h3 style={cardTitleStyle}>Plan Distribution</h3>
-                  <p style={cardSubtitleStyle}>Breakdown by department</p>
-                </div>
-                <button
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: `1px solid ${T.border}`,
-                    background: "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    color: T.muted,
-                    transition: "background 150ms",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <MoreHorizontal size={16} />
-                </button>
-              </div>
-
-              <div style={{ width: "100%", height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={PLAN_DISTRIBUTION_DATA}
-                    layout="vertical"
-                    margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-                    barSize={18}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke={T.border} horizontal={false} />
-                    <XAxis
-                      type="number"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="dept"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
-                      width={80}
-                    />
-                    <Tooltip
-                      cursor={{ fill: "rgba(0,0,0,0.02)" }}
-                      contentStyle={{
-                        background: T.fg,
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 8,
-                        fontSize: 12,
-                        fontFamily: T.font,
-                      }}
-                      itemStyle={{ color: "#fff" }}
-                      labelStyle={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}
-                    />
-                    <Bar dataKey="associate" name="Associate" stackId="a" fill={PLAN_META.Associate.color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="seniorAssociate" name="Senior Associate" stackId="a" fill={PLAN_META["Senior Associate"].color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="manager" name="Manager" stackId="a" fill={PLAN_META.Manager.color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="seniorManager" name="Senior Manager" stackId="a" fill={PLAN_META["Senior Manager"].color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="avp" name="AVP" stackId="a" fill={PLAN_META.AVP.color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="vp" name="VP" stackId="a" fill={PLAN_META.VP.color} radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Legend */}
-              <div style={{ display: "flex", gap: 20, marginTop: 12, justifyContent: "center" }}>
-                {BENEFIT_PLANS.map((plan) => (
-                  <div key={plan} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 2, background: PLAN_META[plan].color }} />
-                    <span style={{ fontSize: 12, color: T.muted }}>{plan}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Benefit Trend — Line chart with dashed target */}
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <div>
-                  <h3 style={cardTitleStyle}>Benefit Trend</h3>
-                  <p style={cardSubtitleStyle}>Actual vs target (in Crores)</p>
-                </div>
-                <DropdownSelector value="Last month" />
-              </div>
-
-              <div style={{ width: "100%", height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={BENEFIT_TREND_DATA} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={T.border} vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
-                      tickFormatter={(v) => `${v}`}
-                    />
-                    <Tooltip content={<TrendTooltip />} />
-                    <Line
-                      type="monotone"
-                      dataKey="target"
-                      name="Target"
-                      stroke={T.mutedLight}
-                      strokeWidth={2}
-                      strokeDasharray="6 4"
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 2, fill: T.card }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="actual"
-                      name="Actual"
-                      stroke={T.accent}
-                      strokeWidth={2.5}
-                      dot={false}
-                      activeDot={{ r: 5, strokeWidth: 2, fill: T.card }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Legend */}
-              <div style={{ display: "flex", gap: 20, marginTop: 12, justifyContent: "center" }}>
-                {[
-                  { label: "Actual", color: T.accent, dashed: false },
-                  { label: "Target", color: T.mutedLight, dashed: true },
-                ].map((item) => (
-                  <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div
-                      style={{
-                        width: 16,
-                        height: 0,
-                        borderTop: `2px ${item.dashed ? "dashed" : "solid"} ${item.color}`,
-                      }}
-                    />
-                    <span style={{ fontSize: 12, color: T.muted }}>{item.label}</span>
-                  </div>
-                ))}
               </div>
             </div>
           </div>
@@ -1483,373 +1110,7 @@ export function Dashboard() {
               </div>
             )}
           </div>
-          </>}
 
-          {/* ═══ BENEFITS TAB ═══════════════════════════════════════════ */}
-          {activeTab === "Benefits" && <>
-            {/* Plan Distribution Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 20 }}>
-              {BENEFIT_PLANS.map((plan) => {
-                const meta = PLAN_META[plan];
-                const planKey = plan.toLowerCase() as "standard" | "premium" | "executive";
-                const totalCount = PLAN_DISTRIBUTION_DATA.reduce((sum, d) => sum + d[planKey], 0);
-                return (
-                  <div
-                    key={plan}
-                    style={{
-                      ...cardStyle,
-                      borderLeft: `4px solid ${meta.color}`,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                      <div
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 10,
-                          background: meta.bgColor,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <ShieldCheck size={20} style={{ color: meta.color }} />
-                      </div>
-                      <div>
-                        <h3 style={{ ...cardTitleStyle, fontSize: 15 }}>{plan}</h3>
-                        <p style={{ ...cardSubtitleStyle, margin: 0 }}>{meta.bracketRange}</p>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 28, fontWeight: 700, color: T.fg, marginBottom: 4, fontVariantNumeric: "tabular-nums" }}>
-                      {totalCount}
-                    </div>
-                    <p style={{ fontSize: 12, color: T.muted, margin: 0 }}>employees enrolled</p>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Benefit Categories & Limits */}
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <div>
-                  <h3 style={cardTitleStyle}>Benefit Categories</h3>
-                  <p style={cardSubtitleStyle}>Category limits and utilization rates</p>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
-                {BENEFIT_CATEGORIES.map((cat) => (
-                  <div
-                    key={cat.name}
-                    style={{
-                      padding: 16,
-                      borderRadius: 10,
-                      border: `1px solid ${T.border}`,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: T.fg }}>{cat.name}</span>
-                      <span style={{ fontSize: 12, color: T.muted, fontVariantNumeric: "tabular-nums" }}>{cat.utilization}%</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: T.muted }}>Limit: {cat.limit}</div>
-                    {/* Utilization gauge */}
-                    <div style={{ width: "100%", height: 6, borderRadius: 3, background: T.bg }}>
-                      <div
-                        style={{
-                          width: `${cat.utilization}%`,
-                          height: "100%",
-                          borderRadius: 3,
-                          background: cat.color,
-                          transition: "width 600ms ease",
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Plan Distribution Chart */}
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <div>
-                  <h3 style={cardTitleStyle}>Plan Distribution by Department</h3>
-                  <p style={cardSubtitleStyle}>Breakdown of employee plans across departments</p>
-                </div>
-              </div>
-              <div style={{ width: "100%", height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={PLAN_DISTRIBUTION_DATA}
-                    layout="vertical"
-                    margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-                    barSize={18}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke={T.border} horizontal={false} />
-                    <XAxis
-                      type="number"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="dept"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
-                      width={80}
-                    />
-                    <Tooltip
-                      cursor={{ fill: "rgba(0,0,0,0.02)" }}
-                      contentStyle={{
-                        background: T.fg,
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 8,
-                        fontSize: 12,
-                        fontFamily: T.font,
-                      }}
-                      itemStyle={{ color: "#fff" }}
-                      labelStyle={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}
-                    />
-                    <Bar dataKey="associate" name="Associate" stackId="a" fill={PLAN_META.Associate.color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="seniorAssociate" name="Senior Associate" stackId="a" fill={PLAN_META["Senior Associate"].color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="manager" name="Manager" stackId="a" fill={PLAN_META.Manager.color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="seniorManager" name="Senior Manager" stackId="a" fill={PLAN_META["Senior Manager"].color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="avp" name="AVP" stackId="a" fill={PLAN_META.AVP.color} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="vp" name="VP" stackId="a" fill={PLAN_META.VP.color} radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div style={{ display: "flex", gap: 20, marginTop: 12, justifyContent: "center" }}>
-                {BENEFIT_PLANS.map((plan) => (
-                  <div key={plan} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 2, background: PLAN_META[plan].color }} />
-                    <span style={{ fontSize: 12, color: T.muted }}>{plan}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>}
-
-          {/* ═══ CLAIMS TAB ═════════════════════════════════════════════ */}
-          {activeTab === "Claims" && <>
-            {/* Claim Status Summary */}
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 20 }}>
-              {[
-                { label: "Total Claims", value: claimStatusCounts.total, color: T.blue, bg: T.blueBg, icon: FileText },
-                { label: "Approved", value: claimStatusCounts.approved, color: T.green, bg: T.greenBg, icon: Check },
-                { label: "Rejected", value: claimStatusCounts.rejected, color: T.red, bg: T.redBg, icon: X },
-                { label: "Pending", value: claimStatusCounts.pending, color: T.amber, bg: T.amberBg, icon: Clock },
-              ].map((stat) => (
-                <div key={stat.label} style={cardStyle}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                    <div
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 10,
-                        background: stat.bg,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <stat.icon size={18} style={{ color: stat.color }} />
-                    </div>
-                    <span style={{ fontSize: 13, color: T.muted, fontWeight: 500 }}>{stat.label}</span>
-                  </div>
-                  <div style={{ fontSize: 32, fontWeight: 700, color: T.fg, fontVariantNumeric: "tabular-nums" }}>
-                    {stat.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Full-width Activity Table */}
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <div>
-                  <h3 style={cardTitleStyle}>All Claims Activity</h3>
-                  <p style={cardSubtitleStyle}>Complete list of recent benefit claims and approvals</p>
-                </div>
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: "transparent",
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 8,
-                    padding: "6px 14px",
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: T.muted,
-                    fontFamily: T.font,
-                    cursor: refreshing ? "default" : "pointer",
-                    opacity: refreshing ? 0.6 : 1,
-                    transition: "background 150ms, border-color 150ms",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!refreshing) {
-                      e.currentTarget.style.background = T.bg;
-                      e.currentTarget.style.borderColor = T.mutedLight;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.borderColor = T.border;
-                  }}
-                >
-                  <RefreshCw
-                    size={13}
-                    style={{ animation: refreshing ? "spin 1s linear infinite" : "none" }}
-                  />
-                  Refresh
-                </button>
-              </div>
-
-              {filteredActivity.length === 0 ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "48px 16px",
-                    color: T.muted,
-                    textAlign: "center",
-                  }}
-                >
-                  <FileText size={32} style={{ color: T.border, marginBottom: 12 }} />
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
-                    {query ? "No claims matching your search" : "No claims activity"}
-                  </p>
-                </div>
-              ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table
-                    style={{
-                      width: "100%",
-                      borderCollapse: "collapse",
-                      fontSize: 13,
-                      fontFamily: T.font,
-                    }}
-                  >
-                    <thead>
-                      <tr>
-                        {["Employee", "Benefit Type", "Amount", "Status", "Date"].map((col) => (
-                          <th
-                            key={col}
-                            style={{
-                              textAlign: "left",
-                              padding: "10px 12px",
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: T.muted,
-                              borderBottom: `1px solid ${T.border}`,
-                              letterSpacing: "0.02em",
-                              textTransform: "uppercase",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {col}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredActivity.map((item, idx) => {
-                        const isApproved = item.action === "approved" || item.status === "approved";
-                        const isRejected = item.action === "rejected" || item.status === "rejected";
-                        const isPending = !isApproved && !isRejected;
-                        const statusLabel = isApproved ? "Approved" : isRejected ? "Rejected" : "Pending";
-                        const statusColor = isApproved ? T.green : isRejected ? T.red : T.amber;
-                        const statusBg = isApproved ? T.greenBg : isRejected ? T.redBg : T.amberBg;
-
-                        return (
-                          <tr
-                            key={item.claimId || idx}
-                            style={{ transition: "background 150ms", cursor: "default" }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                          >
-                            <td
-                              style={{
-                                padding: "12px 12px",
-                                borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
-                                fontWeight: 500,
-                                color: T.fg,
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <div
-                                  style={{
-                                    width: 30,
-                                    height: 30,
-                                    borderRadius: "50%",
-                                    background: item.avatarColor || T.blue,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: "#fff",
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    flexShrink: 0,
-                                    letterSpacing: "0.5px",
-                                  }}
-                                >
-                                  {item.initials || (item.employeeName || "").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
-                                </div>
-                                <span>{item.employeeName}</span>
-                              </div>
-                            </td>
-                            <td style={{ padding: "12px 12px", borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none", color: T.muted }}>
-                              {item.type || item.category || "--"}
-                            </td>
-                            <td style={{ padding: "12px 12px", borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: T.fg, whiteSpace: "nowrap" }}>
-                              {item.amount || "--"}
-                            </td>
-                            <td style={{ padding: "12px 12px", borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none" }}>
-                              <span
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 4,
-                                  padding: "3px 10px",
-                                  borderRadius: 100,
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  color: statusColor,
-                                  background: statusBg,
-                                  lineHeight: "16px",
-                                }}
-                              >
-                                {isApproved && <Check size={11} />}
-                                {isRejected && <X size={11} />}
-                                {isPending && <Clock size={11} />}
-                                {statusLabel}
-                              </span>
-                            </td>
-                            <td style={{ padding: "12px 12px", borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none", color: T.muted, fontSize: 12, whiteSpace: "nowrap" }}>
-                              {item.timestamp || item.dateSubmitted || "--"}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </>}
 
 
         </>

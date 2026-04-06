@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import * as api from "../utils/api";
 import { parseINR } from "../utils/helpers";
 import { useSearch } from "../contexts/SearchContext";
-import { PLAN_META, type SalaryBand, type BenefitPlan } from "../types";
+import { FLEXI_BENEFIT_CATEGORIES, type SalaryBand } from "../types";
 import { DEMO_BRACKETS } from "../utils/demoData";
 
 /* ─── Styles ─────────────────────────────────────────────────────────────────── */
@@ -70,16 +70,6 @@ const RECOMMENDED_THRESHOLDS: Record<string, number> = {
   "Driver's Salary": 10800,
 };
 
-/* ─── Helpers ────────────────────────────────────────────────────────────────── */
-function planBadge(plan: BenefitPlan): CSSProperties {
-  const m = PLAN_META[plan];
-  return {
-    display: "inline-flex", padding: "2px 10px", borderRadius: "var(--rounded-full)",
-    fontSize: "var(--text-xs)", fontWeight: 600, color: m.color,
-    backgroundColor: m.bgColor, border: `1px solid ${m.borderColor}`,
-  };
-}
-
 /* ─── Component ──────────────────────────────────────────────────────────────── */
 export function PolicyEngine() {
   const { query } = useSearch();
@@ -98,9 +88,6 @@ export function PolicyEngine() {
 
   // Add bracket form
   const [newName, setNewName] = useState("");
-  const [newRange, setNewRange] = useState("");
-  const [newPlan, setNewPlan] = useState<BenefitPlan>("Associate");
-  const [includeRangeInName, setIncludeRangeInName] = useState(true);
 
   const fetchPolicy = useCallback(async () => {
     setLoading(true);
@@ -162,21 +149,20 @@ export function PolicyEngine() {
 
   const handleAddBracket = async () => {
     if (!newName.trim()) {
-      toast.error("Please fill required fields");
-      return;
-    }
-    if (includeRangeInName && !newRange.trim()) {
-      toast.error("Please provide a salary range or toggle off the range option");
+      toast.error("Please provide a bracket name");
       return;
     }
     setSaving(true);
     try {
-      const rangeValue = includeRangeInName ? newRange : undefined;
-      const res = await api.createBracket({ name: newName, range: rangeValue ?? "", benefitPlan: newPlan, benefits: [] });
+      const benefits = FLEXI_BENEFIT_CATEGORIES.map(cat => ({
+        name: cat.label, enabled: false, maxPercent: "0", fixedCap: "0",
+        billRequired: cat.defaultBillRequired, carryForward: false, category: cat.key,
+      }));
+      const res = await api.createBracket({ name: newName, benefits });
       setBrackets(res.all?.map((b: any) => ({ ...b, expanded: false })) ?? [...brackets, { ...res.data, expanded: false }]);
-      setShowAddModal(false); setNewName(""); setNewRange(""); setNewPlan("Associate"); setIncludeRangeInName(true);
+      setShowAddModal(false); setNewName("");
       setSetupRequired(false);
-      toast.success("Salary bracket created");
+      toast.success("Bracket created");
     } catch (e: any) { toast.error(e.message || "Operation failed"); }
     finally { setSaving(false); }
   };
@@ -221,8 +207,12 @@ export function PolicyEngine() {
     const lines = text.split("\n").filter(l => l.trim());
     if (lines.length < 2) { toast.error("CSV must have a header row and at least one data row."); return; }
     const rows = lines.slice(1).map(line => {
-      const [name, range, plan] = line.split(",").map(s => s.trim());
-      return { name, range, benefitPlan: plan || "Associate", benefits: [] };
+      const [name] = line.split(",").map(s => s.trim());
+      const benefits = FLEXI_BENEFIT_CATEGORIES.map(cat => ({
+        name: cat.label, enabled: false, maxPercent: "0", fixedCap: "0",
+        billRequired: cat.defaultBillRequired, carryForward: false, category: cat.key,
+      }));
+      return { name, benefits };
     });
     setSaving(true);
     try {
@@ -237,9 +227,7 @@ export function PolicyEngine() {
   const filtered = brackets.filter(b => {
     if (!query.trim()) return true;
     const q = query.toLowerCase();
-    return b.range?.toLowerCase().includes(q) ||
-      b.benefitPlan?.toLowerCase().includes(q) ||
-      b.name?.toLowerCase().includes(q) ||
+    return b.name?.toLowerCase().includes(q) ||
       b.benefits?.some(ben => ben.name?.toLowerCase().includes(q));
   });
 
@@ -310,7 +298,7 @@ export function PolicyEngine() {
             Policy Engine
           </h1>
           <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
-            Manage salary brackets and benefit allocations
+            Manage benefit brackets and allocations
           </p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-3)" }}>
@@ -371,14 +359,8 @@ export function PolicyEngine() {
               <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
                 {bracket.expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                    <span style={{ fontSize: "var(--text-base)", fontWeight: 600, color: "var(--color-foreground)" }}>
-                      {bracket.name}
-                    </span>
-                    <span style={planBadge(bracket.benefitPlan)}>{bracket.benefitPlan}</span>
-                  </div>
-                  <span style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", marginTop: 2 }}>
-                    {bracket.range ? <>{bracket.range} &middot; </> : ""}{bracket.employeeCount} employee{bracket.employeeCount !== 1 ? "s" : ""}
+                  <span style={{ fontSize: "var(--text-base)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                    {bracket.name}
                   </span>
                 </div>
               </div>
@@ -489,7 +471,7 @@ export function PolicyEngine() {
           <div style={modalBox} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-5)" }}>
               <h3 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
-                Add Salary Bracket
+                Add Bracket
               </h3>
               <button style={{ background: "none", border: "none", cursor: "pointer" }} onClick={() => setShowAddModal(false)}>
                 <X size={20} style={{ color: "var(--color-muted-foreground)" }} />
@@ -502,43 +484,6 @@ export function PolicyEngine() {
                 </label>
                 <input style={{ ...inputStyle, marginTop: "var(--space-1)" }} value={newName}
                   onChange={e => setNewName(e.target.value)} placeholder="e.g. Junior Band" />
-              </div>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    Salary Range
-                  </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", cursor: "pointer" }}>
-                    <span>Include in bracket</span>
-                    <button
-                      type="button"
-                      onClick={() => setIncludeRangeInName(prev => !prev)}
-                      style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
-                    >
-                      {includeRangeInName
-                        ? <ToggleRight size={20} style={{ color: "var(--brand-green, #27ae60)" }} />
-                        : <ToggleLeft size={20} style={{ color: "var(--color-muted-foreground)" }} />}
-                    </button>
-                  </label>
-                </div>
-                {includeRangeInName && (
-                  <input style={{ ...inputStyle, marginTop: "var(--space-1)" }} value={newRange}
-                    onChange={e => setNewRange(e.target.value)} placeholder="e.g. ₹2.5L – ₹4L" />
-                )}
-              </div>
-              <div>
-                <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Benefit Plan
-                </label>
-                <select style={{ ...inputStyle, marginTop: "var(--space-1)" }} value={newPlan}
-                  onChange={e => setNewPlan(e.target.value as BenefitPlan)}>
-                  <option value="Associate">Associate</option>
-                  <option value="Senior Associate">Senior Associate</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Senior Manager">Senior Manager</option>
-                  <option value="AVP">AVP</option>
-                  <option value="VP">VP</option>
-                </select>
               </div>
               <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
                 <button style={btnGhost} onClick={() => setShowAddModal(false)}>Cancel</button>
@@ -567,7 +512,7 @@ export function PolicyEngine() {
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
-                  Delete bracket {brackets.find(b => b.id === deleteTarget)?.range ?? ""}?
+                  Delete bracket {brackets.find(b => b.id === deleteTarget)?.name ?? ""}?
                 </h3>
                 <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
                   This action cannot be undone.

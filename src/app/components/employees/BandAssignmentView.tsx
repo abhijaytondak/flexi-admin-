@@ -62,7 +62,7 @@ export function BandAssignmentView({ employees, onRefresh }: Props) {
   const grouped = useMemo(() => {
     const map = Object.fromEntries(BENEFIT_PLANS.map(p => [p, [] as Employee[]])) as Record<BenefitPlan, Employee[]>;
     for (const emp of paginatedEmployees) {
-      map[emp.benefitPlan]?.push(emp);
+      if (emp.benefitPlan) map[emp.benefitPlan]?.push(emp);
     }
     return map;
   }, [paginatedEmployees]);
@@ -71,7 +71,7 @@ export function BandAssignmentView({ employees, onRefresh }: Props) {
   const totalCountsPerBand = useMemo(() => {
     const map = Object.fromEntries(BENEFIT_PLANS.map(p => [p, 0])) as Record<BenefitPlan, number>;
     for (const emp of filtered) {
-      if (map[emp.benefitPlan] !== undefined) map[emp.benefitPlan]++;
+      if (emp.benefitPlan && map[emp.benefitPlan] !== undefined) map[emp.benefitPlan]++;
     }
     return map;
   }, [filtered]);

@@ -7,8 +7,7 @@ import { toast } from "sonner";
 import * as api from "../utils/api";
 import { formatINR, parseINR, deriveBenefitPlan, deriveBracketLabel, getInitials } from "../utils/helpers";
 import { useSearch } from "../contexts/SearchContext";
-import { PLAN_META, AVATAR_COLORS, BENEFIT_PLANS, type Employee, type BenefitPlan, type Claim, type TaxRegime } from "../types";
-import { InvitationManager } from "./employees/InvitationManager";
+import { AVATAR_COLORS, type Employee, type Claim, type TaxRegime } from "../types";
 import { BandAssignmentView } from "./employees/BandAssignmentView";
 import { DEMO_EMPLOYEES, DEMO_CLAIMS } from "../utils/demoData";
 
@@ -52,15 +51,6 @@ const modalBox: CSSProperties = {
   padding: "var(--space-6)", width: 500, maxWidth: "90vw",
   boxShadow: "var(--elevation-lg)",
 };
-
-function planBadge(plan: BenefitPlan): CSSProperties {
-  const m = PLAN_META[plan];
-  return {
-    display: "inline-flex", padding: "2px 10px", borderRadius: "var(--rounded-full)",
-    fontSize: "var(--text-xs)", fontWeight: 600, color: m.color,
-    backgroundColor: m.bgColor, border: `1px solid ${m.borderColor}`,
-  };
-}
 
 function statusDot(status: string): CSSProperties {
   const colors: Record<string, string> = {
@@ -117,7 +107,7 @@ export function EmployeeDirectory() {
   const [setupRequired, setSetupRequired] = useState(false);
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"directory" | "bands" | "invitations">("directory");
+  const [activeTab, setActiveTab] = useState<"directory" | "bands">("directory");
 
   // Filters
   const [planFilter, setPlanFilter] = useState("");
@@ -145,7 +135,6 @@ export function EmployeeDirectory() {
   const [formName, setFormName] = useState("");
   const [formDesignation, setFormDesignation] = useState("");
   const [formEmail, setFormEmail] = useState("");
-  const [formTaxRegime, setFormTaxRegime] = useState<TaxRegime>("new");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const fetchData = useCallback(async () => {
@@ -216,7 +205,7 @@ export function EmployeeDirectory() {
 
   const clearAddForm = () => {
     setFormName(""); setFormDesignation("");
-    setFormEmail(""); setFormTaxRegime("new"); setFormErrors({});
+    setFormEmail(""); setFormErrors({});
   };
 
   const handleAddEmployee = async () => {
@@ -227,7 +216,7 @@ export function EmployeeDirectory() {
       const res = await api.createEmployee({
         name: formName, designation: formDesignation,
         initials: getInitials(formName), color, status: "active",
-        email: formEmail, taxRegime: formTaxRegime,
+        email: formEmail,
       } as any);
       setEmployees(prev => [...prev, res.data]);
       setShowAddModal(false);
@@ -429,25 +418,13 @@ export function EmployeeDirectory() {
                 onChange={e => setFormName(e.target.value)} placeholder="e.g. Priya Sharma" />
               {formErrors.name && <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>{formErrors.name}</p>}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
-              <div>
-                <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Designation *
-                </label>
-                <input style={{ ...inputStyle, marginTop: "var(--space-1)", borderColor: formErrors.designation ? "var(--brand-red)" : undefined }} value={formDesignation}
-                  onChange={e => setFormDesignation(e.target.value)} placeholder="e.g. Software Engineer" />
-                {formErrors.designation && <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>{formErrors.designation}</p>}
-              </div>
-              <div>
-                <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Tax Regime *
-                </label>
-                <select style={{ ...inputStyle, marginTop: "var(--space-1)" }} value={formTaxRegime}
-                  onChange={e => setFormTaxRegime(e.target.value as TaxRegime)}>
-                  <option value="new">New Regime</option>
-                  <option value="old">Old Regime</option>
-                </select>
-              </div>
+            <div>
+              <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Designation *
+              </label>
+              <input style={{ ...inputStyle, marginTop: "var(--space-1)", borderColor: formErrors.designation ? "var(--brand-red)" : undefined }} value={formDesignation}
+                onChange={e => setFormDesignation(e.target.value)} placeholder="e.g. Software Engineer" />
+              {formErrors.designation && <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>{formErrors.designation}</p>}
             </div>
             <div>
               <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
@@ -511,7 +488,7 @@ export function EmployeeDirectory() {
                         border: `1px solid ${row.taxRegime === "old" ? "#FCD34D" : "#6EE7B7"}`,
                       }}>{row.taxRegime === "old" ? "Old" : "New"}</span>
                     </td>
-                    <td style={{ padding: "var(--space-2) var(--space-3)" }}><span style={planBadge(row.benefitPlan)}>{row.benefitPlan}</span></td>
+                    <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--color-foreground)" }}>{row.benefitPlan}</td>
                   </tr>
                 ))}
               </tbody>
@@ -638,9 +615,11 @@ export function EmployeeDirectory() {
                         {emp.designation}
                       </p>
                     )}
-                    <div style={{ marginTop: "var(--space-2)" }}>
-                      <span style={planBadge(emp.benefitPlan)}>{emp.benefitPlan}</span>
-                    </div>
+                    {emp.bracket && (
+                      <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                        {emp.bracket}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
@@ -862,7 +841,6 @@ export function EmployeeDirectory() {
         {([
           { key: "directory" as const, label: "Directory" },
           { key: "bands" as const, label: "Band Assignment" },
-          { key: "invitations" as const, label: "Invitations" },
         ]).map(tab => (
           <button
             key={tab.key}
@@ -888,30 +866,21 @@ export function EmployeeDirectory() {
       {/* Tab Content */}
       {activeTab === "directory" && (
         <>
-          {/* Filters */}
-          <div style={{ display: "flex", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-            <select style={{ ...inputStyle, width: 160 }} value={planFilter} onChange={e => setPlanFilter(e.target.value)}>
-              <option value="">All Plans</option>
-              {BENEFIT_PLANS.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-
           {/* Table */}
           <div style={{
             backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)",
             borderRadius: "var(--rounded-lg)", overflow: "hidden",
           }}>
             <div style={{
-              display: "grid", gridTemplateColumns: "2.5fr 1.2fr 0.8fr 0.8fr 0.6fr",
+              display: "grid", gridTemplateColumns: "2.5fr 1.2fr 1fr 0.6fr",
               gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
               borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-background)",
               fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)",
               textTransform: "uppercase", letterSpacing: "0.04em",
             }}>
-              <span>Employee</span>
-              <span>Designation</span>
-              <span>Tax Regime</span>
-              <span>Plan</span>
+              <span>Name</span>
+              <span>Department</span>
+              <span>Bracket</span>
               <span>Status</span>
             </div>
 
@@ -924,7 +893,7 @@ export function EmployeeDirectory() {
                 <div key={emp.id || idx}
                   onClick={() => openProfile(emp)}
                   style={{
-                    display: "grid", gridTemplateColumns: "2.5fr 1.2fr 0.8fr 0.8fr 0.6fr",
+                    display: "grid", gridTemplateColumns: "2.5fr 1.2fr 1fr 0.6fr",
                     gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
                     borderBottom: idx < filtered.length - 1 ? "1px solid var(--color-border)" : "none",
                     cursor: "pointer", transition: "background-color 150ms",
@@ -946,20 +915,11 @@ export function EmployeeDirectory() {
                     </span>
                   </div>
                   <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center" }}>
-                    {emp.designation}
+                    {emp.department || "—"}
                   </span>
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <span style={{
-                      display: "inline-flex", padding: "2px 10px", borderRadius: "var(--rounded-full)",
-                      fontSize: "var(--text-xs)", fontWeight: 600,
-                      color: emp.taxRegime === "old" ? "#B45309" : "#047857",
-                      backgroundColor: emp.taxRegime === "old" ? "#FEF3C7" : "#D1FAE5",
-                      border: `1px solid ${emp.taxRegime === "old" ? "#FCD34D" : "#6EE7B7"}`,
-                    }}>{emp.taxRegime === "old" ? "Old" : "New"}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <span style={planBadge(emp.benefitPlan)}>{emp.benefitPlan}</span>
-                  </div>
+                  <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center" }}>
+                    {emp.bracket || "—"}
+                  </span>
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
                     <div style={statusDot(emp.status)} />
                     <span style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", textTransform: "capitalize" }}>
@@ -975,10 +935,6 @@ export function EmployeeDirectory() {
 
       {activeTab === "bands" && (
         <BandAssignmentView employees={employees} onRefresh={fetchData} />
-      )}
-
-      {activeTab === "invitations" && (
-        <InvitationManager employees={employees} onRefresh={fetchData} />
       )}
 
       {/* Employee Profile Drawer */}
