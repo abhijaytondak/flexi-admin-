@@ -6,8 +6,6 @@ import {
   ClipboardCheck,
   Download,
   Users,
-  Settings,
-  Search,
   Bell,
   ChevronRight,
   HelpCircle,
@@ -15,9 +13,10 @@ import {
   ChevronsUpDown,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
+import { toast } from "sonner";
 import { UserProfileProvider, useUserProfile } from "../contexts/UserProfileContext";
-import { SearchProvider, useSearch } from "../contexts/SearchContext";
 import { NotificationDrawer } from "./NotificationDrawer";
 import { useIsMobile } from "../hooks/useIsMobile";
 
@@ -62,25 +61,14 @@ const MAIN_NAV_ITEMS = [
   },
 ] as const;
 
-const BOTTOM_NAV_ITEMS = [
-  {
-    path: "/settings",
-    label: "Settings",
-    icon: Settings,
-    iconBg: "var(--icon-settings-bg)",
-    iconFg: "var(--icon-settings-fg)",
-  },
-] as const;
-
 // Combined for route matching
-const NAV_ITEMS = [...MAIN_NAV_ITEMS, ...BOTTOM_NAV_ITEMS];
+const NAV_ITEMS = [...MAIN_NAV_ITEMS];
 
 function getPageTitle(pathname: string): string {
   if (pathname === "/") return "Dashboard";
   const item = NAV_ITEMS.find((n) => n.path === pathname);
   if (item) return item.label;
   if (pathname === "/onboarding") return "Onboarding";
-  if (pathname === "/fiscal") return "Fiscal Settings";
   if (pathname === "/help") return "Help Center";
   return "SalarySe";
 }
@@ -209,18 +197,25 @@ function LayoutInner() {
   const location = useLocation();
   const navigate = useNavigate();
   const { profile } = useUserProfile();
-  const { query, setQuery } = useSearch();
   const isMobile = useIsMobile();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
-  // Clear search on route change & close mobile sidebar
+  // Close mobile sidebar on route change
   useEffect(() => {
-    setQuery("");
     setSidebarOpen(false);
-  }, [location.pathname, setQuery]);
+    setProfileMenuOpen(false);
+  }, [location.pathname]);
+
+  const handleLogout = useCallback(() => {
+    try { localStorage.removeItem("userProfile"); } catch { /* noop */ }
+    setProfileMenuOpen(false);
+    toast.success("Logged out");
+    navigate("/");
+  }, [navigate]);
 
   const handleUnreadCountChange = useCallback((count: number) => {
     setUnreadCount(count);
@@ -307,54 +302,6 @@ function LayoutInner() {
           )}
         </div>
 
-        {/* ── Sidebar Search ──────────────────────────────────────────── */}
-        <div style={{ padding: "0 12px 8px" }}>
-          <div
-            className="flex items-center gap-2"
-            style={{
-              padding: "6px 10px",
-              borderRadius: 8,
-              border: "1px solid var(--color-border)",
-              backgroundColor: "var(--sidebar-hover-bg)",
-            }}
-          >
-            <Search
-              size={14}
-              style={{ color: "var(--sidebar-text-muted)", flexShrink: 0 }}
-            />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              style={{
-                border: "none",
-                outline: "none",
-                background: "none",
-                fontSize: "var(--text-sm)",
-                color: "var(--sidebar-text)",
-                fontFamily: "'IBM Plex Sans', sans-serif",
-                width: "100%",
-              }}
-            />
-            <kbd
-              style={{
-                fontSize: 10,
-                fontFamily: "'IBM Plex Sans', sans-serif",
-                color: "var(--sidebar-text-muted)",
-                backgroundColor: "var(--color-background)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 4,
-                padding: "1px 5px",
-                lineHeight: 1.4,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {"\u2318"}K
-            </kbd>
-          </div>
-        </div>
-
         {/* ── Divider ─────────────────────────────────────────────────── */}
         <div
           style={{
@@ -387,7 +334,6 @@ function LayoutInner() {
             <SidebarNavItem key={item.path} {...item} />
           ))}
 
-          {/* Settings section */}
           <div
             style={{
               height: 1,
@@ -395,22 +341,6 @@ function LayoutInner() {
               margin: "12px 4px 8px",
             }}
           />
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 500,
-              color: "var(--sidebar-text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              padding: "4px 12px 6px",
-            }}
-          >
-            Settings
-          </div>
-
-          {BOTTOM_NAV_ITEMS.map((item) => (
-            <SidebarNavItem key={item.path} {...item} />
-          ))}
 
           {/* Help center — linked to /help route */}
           <SidebarNavItem
@@ -423,68 +353,100 @@ function LayoutInner() {
         </nav>
 
         {/* ── Profile Footer ──────────────────────────────────────────── */}
-        <button
-          onClick={() => navigate("/settings")}
-          className="flex items-center gap-3 transition-colors duration-150"
-          style={{
-            padding: "12px 16px",
-            borderTop: "1px solid var(--sidebar-divider)",
-            background: "none",
-            border: "none",
-            borderTopWidth: 1,
-            borderTopStyle: "solid",
-            borderTopColor: "var(--sidebar-divider)",
-            cursor: "pointer",
-            textAlign: "left",
-            width: "100%",
-            fontFamily: "'IBM Plex Sans', sans-serif",
-          }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.backgroundColor = "transparent")
-          }
-        >
-          <div
-            className="flex items-center justify-center shrink-0"
+        <div style={{ position: "relative", borderTop: "1px solid var(--sidebar-divider)" }}>
+          <button
+            onClick={() => setProfileMenuOpen((v) => !v)}
+            className="flex items-center gap-3 transition-colors duration-150"
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: "var(--rounded-full)",
-              backgroundColor: profile.avatarColor,
-              fontSize: "var(--text-xs)",
-              fontWeight: 600,
-              color: "#fff",
+              padding: "12px 16px",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              textAlign: "left",
+              width: "100%",
+              fontFamily: "'IBM Plex Sans', sans-serif",
             }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = "transparent")
+            }
           >
-            {profile.initials}
-          </div>
-          <div className="flex-1 min-w-0">
             <div
-              className="truncate"
+              className="flex items-center justify-center shrink-0"
               style={{
-                fontSize: "var(--text-sm)",
-                fontWeight: 500,
-                color: "var(--sidebar-text)",
-                lineHeight: 1.3,
-              }}
-            >
-              {profile.name}
-            </div>
-            <div
-              className="truncate"
-              style={{
+                width: 32,
+                height: 32,
+                borderRadius: "var(--rounded-full)",
+                backgroundColor: profile.avatarColor,
                 fontSize: "var(--text-xs)",
-                color: "var(--sidebar-text-muted)",
-                lineHeight: 1.3,
+                fontWeight: 600,
+                color: "#fff",
               }}
             >
-              {profile.designation}
+              {profile.initials}
             </div>
-          </div>
-          <Settings size={15} style={{ color: "var(--sidebar-text-muted)", flexShrink: 0 }} />
-        </button>
+            <div className="flex-1 min-w-0">
+              <div
+                className="truncate"
+                style={{
+                  fontSize: "var(--text-sm)",
+                  fontWeight: 500,
+                  color: "var(--sidebar-text)",
+                  lineHeight: 1.3,
+                }}
+              >
+                {profile.name}
+              </div>
+              <div
+                className="truncate"
+                style={{
+                  fontSize: "var(--text-xs)",
+                  color: "var(--sidebar-text-muted)",
+                  lineHeight: 1.3,
+                }}
+              >
+                Profile
+              </div>
+            </div>
+          </button>
+
+          {profileMenuOpen && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "calc(100% + 4px)",
+                left: 12,
+                right: 12,
+                backgroundColor: "var(--color-card)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                padding: 8,
+                zIndex: 50,
+              }}
+            >
+              <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--color-border)", marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-foreground)" }}>{profile.name}</div>
+                <div style={{ fontSize: 11, color: "var(--color-muted-foreground)" }}>{profile.email}</div>
+              </div>
+              <button
+                onClick={handleLogout}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  padding: "8px 10px", background: "none", border: "none",
+                  borderRadius: 6, cursor: "pointer", textAlign: "left",
+                  fontSize: 13, color: "var(--brand-red)", fontFamily: "'IBM Plex Sans', sans-serif",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-background)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                <LogOut size={14} /> Logout
+              </button>
+            </div>
+          )}
+        </div>
       </aside>
 
       {/* ─── Main Area ───────────────────────────────────────────────── */}
@@ -637,9 +599,7 @@ function LayoutInner() {
 export function Layout() {
   return (
     <UserProfileProvider>
-      <SearchProvider>
-        <LayoutInner />
-      </SearchProvider>
+      <LayoutInner />
     </UserProfileProvider>
   );
 }

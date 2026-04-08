@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import * as api from "../utils/api";
-import { useSearch } from "../contexts/SearchContext";
 import { useUserProfile } from "../contexts/UserProfileContext";
 import { AVATAR_COLORS } from "../types";
 import { DEMO_DASHBOARD, DEMO_EMPLOYEES } from "../utils/demoData";
@@ -445,7 +444,6 @@ const BENEFIT_CATEGORIES = [
 
 export function Dashboard() {
   const { profile, saveProfile } = useUserProfile();
-  const { query } = useSearch();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
@@ -505,19 +503,8 @@ export function Dashboard() {
     }
   };
 
-  /* ─── Filter activity by search ─────────────────────────────────────── */
-  const filteredActivity = recentActivity.filter((item) => {
-    if (!query) return true;
-    const q = query.toLowerCase();
-    return (
-      item.employeeName?.toLowerCase().includes(q) ||
-      item.type?.toLowerCase().includes(q) ||
-      item.claimId?.toLowerCase().includes(q) ||
-      item.action?.toLowerCase().includes(q) ||
-      item.amount?.toString().toLowerCase().includes(q) ||
-      item.category?.toLowerCase().includes(q)
-    );
-  });
+  /* ─── Activity ──────────────────────────────────────────────────────── */
+  const filteredActivity = recentActivity;
 
   /* ─── Claim status counts for Claims tab ───────────────────────────── */
   const claimStatusCounts = useMemo(() => {
@@ -944,10 +931,10 @@ export function Dashboard() {
               >
                 <FileText size={32} style={{ color: T.border, marginBottom: 12 }} />
                 <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
-                  {query ? "No activity matching your search" : "No recent activity"}
+                  No recent activity
                 </p>
                 <p style={{ margin: "4px 0 0", fontSize: 12 }}>
-                  {query ? "Try adjusting your search query" : "Approval actions will appear here"}
+                  Approval actions will appear here
                 </p>
               </div>
             ) : (

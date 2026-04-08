@@ -77,7 +77,7 @@ export const FLEXI_BENEFIT_CATEGORIES: { key: AllowanceCategory; label: string; 
   { key: "hostel", label: "Hostel Expenditure Allowance", defaultBillRequired: true },
   { key: "books_periodicals", label: "Books and Periodicals", defaultBillRequired: true },
   { key: "professional_development", label: "Professional Development Allowance", defaultBillRequired: true },
-  { key: "phone_internet", label: "Phone / Internet Allowance", defaultBillRequired: true },
+  { key: "phone_internet", label: "Phone/Internet Allowance", defaultBillRequired: true },
   { key: "health_fitness", label: "Health and Fitness Allowance", defaultBillRequired: true },
   { key: "uniform", label: "Uniform Allowance", defaultBillRequired: true },
   { key: "gift", label: "Gift Allowance", defaultBillRequired: false },
@@ -87,11 +87,21 @@ export const FLEXI_BENEFIT_CATEGORIES: { key: AllowanceCategory; label: string; 
   { key: "drivers_salary", label: "Driver's Salary", defaultBillRequired: true },
 ];
 
+export type PerTxnBasis = "per_meal" | "per_day" | "per_swipe";
+
+export interface PerTxnLimit {
+  enabled: boolean;
+  amount: string;
+  basis: PerTxnBasis;
+}
+
 export interface Allowance {
   name: string;
   enabled: boolean;
   maxPercent: string;
-  fixedCap: string;
+  monthlyLimit: string;
+  annualLimit: string;
+  perTxnLimit?: PerTxnLimit;
   billRequired: boolean;
   carryForward: boolean;
   category: AllowanceCategory;
@@ -102,7 +112,10 @@ export interface SalaryBand {
   name: string;
   benefits: Allowance[];
   expanded: boolean;
+  globalMaxLimit?: string;
 }
+
+export const FLEXI_CATEGORY_LABELS: string[] = FLEXI_BENEFIT_CATEGORIES.map((c) => c.label);
 
 export interface SalaryStructure {
   basicPay: { percent: number; inclusion: boolean };

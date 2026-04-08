@@ -111,7 +111,6 @@ export function PayrollExport() {
   const [exportFormat, setExportFormat] = useState<ExportFormat>("csv");
   const [cycleScope, setCycleScope] = useState<CycleScope>("current");
   const [showExportDropdown, setShowExportDropdown] = useState(false);
-  const [viewMode, setViewMode] = useState<"summary" | "detail">("summary");
   const exportDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -150,46 +149,6 @@ export function PayrollExport() {
     gadget: filteredData.reduce((s, r) => s + r.gadget, 0),
   };
   const grandTotal = colTotals.food + colTotals.fuel + colTotals.comm + colTotals.profPursuit + colTotals.gadget;
-
-  /** Compute summary for summary view */
-  const computeSummary = useMemo(() => {
-    const categories = [
-      { category: "Food & Meals", amount: colTotals.food },
-      { category: "Fuel & Travel", amount: colTotals.fuel },
-      { category: "Communication", amount: colTotals.comm },
-      { category: "Professional Development", amount: colTotals.profPursuit },
-      { category: "Health & Fitness", amount: colTotals.gadget },
-    ];
-    const categoryBreakdown = categories
-      .filter(c => c.amount > 0)
-      .map(c => ({ ...c, percentage: grandTotal > 0 ? Math.round((c.amount / grandTotal) * 100) : 0 }))
-      .sort((a, b) => b.amount - a.amount);
-    // Rough month-over-month change estimate
-    const prevMonthIdx = MONTHS.indexOf(selectedMonth) - 1;
-    let monthOverMonthChange = 0;
-    if (prevMonthIdx >= 0) {
-      const prevData = getDataForMonth(MONTHS[prevMonthIdx]);
-      const prevTotal = prevData.reduce((s, r) => s + total(r), 0);
-      monthOverMonthChange = prevTotal > 0 ? Math.round(((totalReimbursable - prevTotal) / prevTotal) * 100) : 0;
-    }
-    return { totalAmount: totalReimbursable, employeeCount: employeesWithClaims, categoryBreakdown, monthOverMonthChange };
-  }, [colTotals, grandTotal, selectedMonth, totalReimbursable, employeesWithClaims]);
-
-  const handleExportSummary = useCallback(() => {
-    const { categoryBreakdown, totalAmount, employeeCount, monthOverMonthChange } = computeSummary;
-    const lines = [
-      `Payroll Summary - ${selectedMonth} ${selectedYear}`,
-      `Total Reimbursable,${totalAmount}`,
-      `Employees with Claims,${employeeCount}`,
-      `Avg per Employee,${employeeCount > 0 ? Math.round(totalAmount / employeeCount) : 0}`,
-      `Month-over-Month Change,${monthOverMonthChange}%`,
-      "",
-      "Category,Amount,Percentage",
-      ...categoryBreakdown.map(c => `${c.category},${c.amount},${c.percentage}%`),
-    ];
-    downloadFile(lines.join("\n"), `payroll_summary_${selectedMonth}_${selectedYear}.csv`, "text/csv");
-    toast.success("Summary exported as CSV");
-  }, [computeSummary, selectedMonth, selectedYear]);
 
   /** Gather data rows based on the selected cycle scope */
   const getExportData = useCallback((): { data: MockRow[]; label: string } => {
@@ -380,10 +339,7 @@ export function PayrollExport() {
         </div>
       </div>
 
-      {/* Summary / Detail Toggle */}
-      {viewMode === "summary" ? (
-        <>
-          {/* KPI Strip */}
+      {/* KPI Strip */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-4)", marginBottom: "var(--space-6)" }}>
             <StatCard
               title="Total Reimbursable"
@@ -413,74 +369,6 @@ export function PayrollExport() {
               color="#9B59B6"
               bgColor="#F4ECF7"
             />
-          </div>
-
-          {/* Category Breakdown */}
-          <div style={{
-            backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)",
-            borderRadius: "var(--rounded-lg)", padding: "var(--space-5)", marginBottom: "var(--space-5)",
-          }}>
-            <h3 style={{ margin: "0 0 var(--space-4)", fontSize: "var(--text-base)", fontWeight: 600, color: "var(--color-foreground)" }}>
-              Category Breakdown
-            </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-              {computeSummary.categoryBreakdown.map(cat => (
-                <div key={cat.category}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)" }}>{cat.category}</span>
-                    <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
-                      {formatINR(cat.amount)} ({cat.percentage}%)
-                    </span>
-                  </div>
-                  <div style={{ height: 8, backgroundColor: "var(--color-border)", borderRadius: 4, overflow: "hidden" }}>
-                    <div style={{
-                      width: `${cat.percentage}%`, height: "100%", borderRadius: 4,
-                      backgroundColor: "var(--brand-accent)",
-                      transition: "width 300ms ease-out",
-                    }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-            {computeSummary.monthOverMonthChange !== 0 && (
-              <p style={{ marginTop: "var(--space-4)", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
-                Month-over-month change: <span style={{
-                  fontWeight: 600,
-                  color: computeSummary.monthOverMonthChange > 0 ? "var(--brand-green)" : "var(--brand-red)",
-                }}>{computeSummary.monthOverMonthChange > 0 ? "+" : ""}{computeSummary.monthOverMonthChange}%</span>
-              </p>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div style={{ display: "flex", gap: "var(--space-3)" }}>
-            <button style={btnPrimary} onClick={() => setViewMode("detail")}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
-              <FileText size={16} /> View Details
-            </button>
-            <button style={{
-              ...btnPrimary, backgroundColor: "transparent", color: "var(--color-muted-foreground)",
-              border: "1px solid var(--color-border)",
-            }} onClick={handleExportSummary}
-              onMouseEnter={e => { e.currentTarget.style.backgroundColor = "var(--color-background)"; }}
-              onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}>
-              <Download size={16} /> Export Summary
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Back to Summary */}
-          <div style={{ marginBottom: "var(--space-4)" }}>
-            <button style={{
-              ...btnPrimary, backgroundColor: "transparent", color: "var(--color-muted-foreground)",
-              border: "1px solid var(--color-border)",
-            }} onClick={() => setViewMode("summary")}
-              onMouseEnter={e => { e.currentTarget.style.backgroundColor = "var(--color-background)"; }}
-              onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}>
-              Back to Summary
-            </button>
           </div>
 
       {/* Data Table */}
@@ -602,8 +490,6 @@ export function PayrollExport() {
       }}>
         Payroll data for {selectedMonth} {selectedYear}. Export as CSV, PDF, or Excel for processing in your payroll system.
       </p>
-        </>
-      )}
 
       {/* Employee Detail Drawer */}
       {selectedRow && (

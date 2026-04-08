@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
+import React, { useState, useEffect, useCallback, type CSSProperties } from "react";
 import {
-  Check, X, ChevronDown, ChevronRight, Filter, Upload, AlertCircle,
+  Check, X, ChevronDown, ChevronRight, Filter, AlertCircle,
   Clock, CheckCircle, XCircle, FileText, Loader2,
-  Download, Eye
+  Eye, Search, Image as ImageIcon
 } from "lucide-react";
 import { toast } from "sonner";
-import * as api from "../utils/api";
 import { parseINR } from "../utils/helpers";
-import { useSearch } from "../contexts/SearchContext";
-import { type Claim, type ClaimStatus } from "../types";
+import { type Claim, type ClaimStatus, FLEXI_CATEGORY_LABELS } from "../types";
 import { DEMO_CLAIMS } from "../utils/demoData";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
@@ -35,7 +33,6 @@ const inputStyle: CSSProperties = {
 };
 
 const STATUS_FILTERS = ["All", "Pending", "Approved", "Rejected"] as const;
-const CATEGORIES = ["All", "Food", "Fuel", "Phone/Internet", "Education", "Health", "Travel", "Other"] as const;
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: any }> = {
   pending: { color: "var(--brand-amber)", bg: "var(--brand-amber-light)", icon: Clock },
@@ -134,8 +131,7 @@ function StatusTimeline({ status }: { status: string }) {
 }
 
 export function ApprovalQueue() {
-  const { query } = useSearch();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState("");
 
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,6 +162,8 @@ export function ApprovalQueue() {
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [showApproveAllDialog, setShowApproveAllDialog] = useState(false);
+  const [approveAllTargets, setApproveAllTargets] = useState<Claim[]>([]);
   const [showBulkRejectDialog, setShowBulkRejectDialog] = useState(false);
   const [bulkRejectReason, setBulkRejectReason] = useState("");
   const [bulkReturnToLimit, setBulkReturnToLimit] = useState(true);
@@ -261,31 +259,6 @@ export function ApprovalQueue() {
     setRejectLoading(false);
   };
 
-  const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    const lines = text.split("\n").filter(l => l.trim());
-    if (lines.length < 2) return;
-    const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
-    const rows = lines.slice(1).map(line => {
-      const vals = line.split(",").map(s => s.trim());
-      const obj: any = {};
-      headers.forEach((h, i) => { obj[h] = vals[i]; });
-      return obj;
-    });
-    try {
-      const res = await api.bulkImportClaims(rows);
-      const imported = res.data || [];
-      setClaims(prev => [...prev, ...imported]);
-      setSetupRequired(false);
-      toast.success(`Imported ${imported.length} claims`);
-    } catch (e: any) {
-      toast.error(e.message || "Action failed");
-    }
-    finally { if (fileRef.current) fileRef.current.value = ""; }
-  };
-
   // Bulk actions
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -304,6 +277,33 @@ export function ApprovalQueue() {
   };
 
   const clearSelection = () => setSelectedIds(new Set());
+
+  const PENDING_STATUSES = ["pending", "submitted", "claimed", "invoice_pending"];
+
+  const openApproveAllDialog = (filteredClaims: Claim[]) => {
+    const pending = filteredClaims.filter(c => PENDING_STATUSES.includes(c.status));
+    if (pending.length === 0) {
+      toast.error("No pending claims in current view");
+      return;
+    }
+    setApproveAllTargets(pending);
+    setShowApproveAllDialog(true);
+  };
+
+  const confirmApproveAll = async () => {
+    const ids = new Set(approveAllTargets.map(c => c.id));
+    if (ids.size === 0) { setShowApproveAllDialog(false); return; }
+    setBulkLoading(true);
+    const toastId = toast.loading(`Approving ${ids.size} claims...`);
+    setClaims(prev => prev.map(c => ids.has(c.id)
+      ? { ...c, status: "approved" as ClaimStatus, actionNote: "Bulk approved (all pending) by Admin", actionTimestamp: new Date().toISOString(), actionBy: "Amanda Johnson" }
+      : c));
+    toast.success(`${ids.size} claims approved`, { id: toastId });
+    setSelectedIds(new Set());
+    setApproveAllTargets([]);
+    setShowApproveAllDialog(false);
+    setBulkLoading(false);
+  };
 
   const bulkApprove = async () => {
     const ids = Array.from(selectedIds);
@@ -367,10 +367,7 @@ export function ApprovalQueue() {
     filtered = filtered.filter(c => c.status.toLowerCase() === statusFilter.toLowerCase());
   }
   if (categoryFilter !== "All") {
-    filtered = filtered.filter(c =>
-      c.category?.toLowerCase().includes(categoryFilter.toLowerCase()) ||
-      c.benefitType?.toLowerCase().includes(categoryFilter.toLowerCase())
-    );
+    filtered = filtered.filter(c => c.benefitType === categoryFilter);
   }
   if (deptFilter) filtered = filtered.filter(c => c.department === deptFilter);
   if (dateFrom) filtered = filtered.filter(c => c.dateSubmitted >= dateFrom);
@@ -408,10 +405,6 @@ export function ApprovalQueue() {
           <p style={{ margin: "var(--space-2) 0 var(--space-6)", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
             Claims will appear here once employees start submitting benefit reimbursement requests.
           </p>
-          <button style={btnGhost} onClick={() => fileRef.current?.click()}>
-            <Upload size={16} /> Import Claims CSV
-          </button>
-          <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleCSVImport} />
         </div>
       </div>
     );
@@ -455,10 +448,34 @@ export function ApprovalQueue() {
             {filtered.length} claim{filtered.length !== 1 ? "s" : ""} to review
           </p>
         </div>
-        <button style={btnGhost} onClick={() => fileRef.current?.click()}>
-          <Upload size={16} /> Import CSV
-        </button>
-        <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleCSVImport} />
+        <div style={{ display: "flex", gap: "var(--space-3)" }}>
+          {(() => {
+            const pendingInView = filtered.filter(c => PENDING_STATUSES.includes(c.status)).length;
+            if (pendingInView === 0) return null;
+            return (
+              <button
+                style={{ ...btnPrimary, backgroundColor: "var(--brand-green)" }}
+                onClick={() => openApproveAllDialog(filtered)}
+                disabled={bulkLoading}
+                title="Approve every pending claim matching current filters"
+              >
+                <CheckCircle size={16} /> Approve All Pending ({pendingInView})
+              </button>
+            );
+          })()}
+        </div>
+      </div>
+
+      {/* Local Search */}
+      <div style={{ position: "relative", marginBottom: "var(--space-4)", maxWidth: 360 }}>
+        <Search size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--color-muted-foreground)" }} />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by employee, claim ID, merchant…"
+          style={{ ...inputStyle, paddingLeft: 36 }}
+        />
       </div>
 
       {/* Submission Deadline Banner */}
@@ -501,18 +518,16 @@ export function ApprovalQueue() {
           </button>
         ))}
         <div style={{ width: 1, backgroundColor: "var(--color-border)", margin: "0 var(--space-2)" }} />
-        {CATEGORIES.map(c => (
-          <button key={c} onClick={() => setCategoryFilter(c)} style={{
-            ...font, padding: "var(--space-1) var(--space-3)",
-            borderRadius: "var(--rounded-full)", fontSize: "var(--text-xs)", fontWeight: 500,
-            border: "1px solid var(--color-border)", cursor: "pointer",
-            backgroundColor: categoryFilter === c ? "var(--brand-green)" : "transparent",
-            color: categoryFilter === c ? "#fff" : "var(--color-muted-foreground)",
-            transition: "all 150ms",
-          }}>
-            {c}
-          </button>
-        ))}
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          style={{ ...inputStyle, width: 240, padding: "var(--space-1) var(--space-3)", fontSize: "var(--text-sm)" }}
+        >
+          <option value="All">All Categories</option>
+          {FLEXI_CATEGORY_LABELS.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
         <button style={{ ...btnGhost, padding: "var(--space-1) var(--space-3)" }}
           onClick={() => setShowAdvanced(!showAdvanced)}>
           <Filter size={14} /> {showAdvanced ? "Hide" : "More"}
@@ -551,6 +566,23 @@ export function ApprovalQueue() {
             <input type="number" style={{ ...inputStyle, marginTop: 4 }} value={amountMax} onChange={e => setAmountMax(e.target.value)} placeholder="No limit" />
           </div>
         </div>
+      )}
+
+      {/* Select All */}
+      {filtered.length > 0 && (
+        <label style={{
+          display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
+          marginBottom: "var(--space-3)", fontSize: "var(--text-sm)",
+          color: "var(--color-foreground)", cursor: "pointer", fontWeight: 500,
+        }}>
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={() => toggleSelectAll(filtered)}
+            style={{ cursor: "pointer", width: 16, height: 16 }}
+          />
+          Select all visible ({filtered.length})
+        </label>
       )}
 
       {/* Claims — Grouped by Employee */}
@@ -879,6 +911,30 @@ export function ApprovalQueue() {
                 </div>
               )}
 
+              {/* Fuel Bill Photo (Fuel Allowance only) */}
+              {selectedClaim.benefitType === "Fuel Allowance" && (
+                <div style={{ marginBottom: "var(--space-5)" }}>
+                  <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    Fuel Bill Photo
+                  </p>
+                  <div style={{
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                    gap: "var(--space-2)", padding: "var(--space-6)",
+                    backgroundColor: "var(--color-background)",
+                    border: "1px dashed var(--color-border)", borderRadius: "var(--rounded-md)",
+                    minHeight: 180,
+                  }}>
+                    <ImageIcon size={36} style={{ color: "var(--color-muted-foreground)" }} />
+                    <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                      Fuel Bill Receipt
+                    </span>
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                      {selectedClaim.merchantName || "Fuel station"} · {selectedClaim.dateSubmitted}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Receipt */}
               {selectedClaim.receiptDescription && (
                 <div style={{ marginBottom: "var(--space-5)" }}>
@@ -1034,6 +1090,67 @@ export function ApprovalQueue() {
           </div>
         </>
       )}
+
+      {/* Approve All Pending Confirmation */}
+      {showApproveAllDialog && (() => {
+        const totalAmount = approveAllTargets.reduce((sum, c) => sum + parseINR(c.claimAmount), 0);
+        const userCount = new Set(approveAllTargets.map(c => c.employeeId || c.employeeName)).size;
+        return (
+          <>
+            <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1000 }}
+              onClick={() => !bulkLoading && setShowApproveAllDialog(false)} />
+            <div style={{
+              ...font, position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+              backgroundColor: "var(--color-card)", borderRadius: "var(--rounded-lg)",
+              padding: "var(--space-6)", width: 460, maxWidth: "90vw",
+              boxShadow: "var(--elevation-lg)", zIndex: 1001,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: "var(--rounded-full)",
+                  backgroundColor: "var(--brand-green-light)", display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                }}>
+                  <CheckCircle size={22} style={{ color: "var(--brand-green)" }} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                    Approve All Pending Claims?
+                  </h3>
+                  <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
+                    Matching current filters
+                  </p>
+                </div>
+              </div>
+              <div style={{
+                padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-4)",
+                backgroundColor: "var(--color-background)", borderRadius: "var(--rounded-md)",
+                border: "1px solid var(--color-border)",
+                fontSize: "var(--text-sm)", color: "var(--color-foreground)", lineHeight: 1.7,
+              }}>
+                <div><strong>{approveAllTargets.length}</strong> claim{approveAllTargets.length !== 1 ? "s" : ""}</div>
+                <div><strong>{userCount}</strong> employee{userCount !== 1 ? "s" : ""}</div>
+                <div>Total: <strong>₹{totalAmount.toLocaleString("en-IN")}</strong></div>
+              </div>
+              <p style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", marginBottom: "var(--space-4)" }}>
+                All listed claims will be marked approved and employees notified. This cannot be undone in bulk.
+              </p>
+              <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>
+                <button style={btnGhost} disabled={bulkLoading}
+                  onClick={() => setShowApproveAllDialog(false)}>Cancel</button>
+                <button
+                  style={{ ...btnPrimary, backgroundColor: "var(--brand-green)", opacity: bulkLoading ? 0.6 : 1 }}
+                  disabled={bulkLoading}
+                  onClick={confirmApproveAll}
+                >
+                  {bulkLoading ? <Spinner size={16} /> : <CheckCircle size={16} />}
+                  Approve {approveAllTargets.length}
+                </button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Bulk Rejection Dialog */}
       {showBulkRejectDialog && (

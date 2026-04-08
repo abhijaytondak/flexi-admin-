@@ -101,14 +101,6 @@ const FAQS: { question: string; answer: string }[] = [
   },
 ];
 
-/* ─── Keyboard shortcuts ───────────────────────────────────────────────── */
-
-const SHORTCUTS = [
-  { keys: "ESC", action: "Close drawers / modals" },
-  { keys: "\u2318K", action: "Focus search" },
-  { keys: "\u2318S", action: "Save current form (future)" },
-];
-
 /* ─── Accordion Item ───────────────────────────────────────────────────── */
 
 function AccordionItem({
@@ -485,98 +477,6 @@ export function HelpCenter() {
         </div>
       </section>
 
-      {/* ── Keyboard Shortcuts ──────────────────────────────────────────── */}
-      <section style={{ marginBottom: 40 }}>
-        <h2
-          style={{
-            fontSize: "var(--text-lg)",
-            fontWeight: 600,
-            color: "var(--color-foreground)",
-            marginBottom: 16,
-          }}
-        >
-          Keyboard Shortcuts
-        </h2>
-        <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-          <table
-            style={{
-              ...font,
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "var(--text-sm)",
-            }}
-          >
-            <thead>
-              <tr
-                style={{
-                  backgroundColor: "var(--color-surface)",
-                  borderBottom: "1px solid #EBEBEB",
-                }}
-              >
-                <th
-                  style={{
-                    textAlign: "left",
-                    padding: "10px 24px",
-                    fontWeight: 600,
-                    color: "var(--sidebar-text-muted)",
-                    fontSize: "var(--text-xs)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  Shortcut
-                </th>
-                <th
-                  style={{
-                    textAlign: "left",
-                    padding: "10px 24px",
-                    fontWeight: 600,
-                    color: "var(--sidebar-text-muted)",
-                    fontSize: "var(--text-xs)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {SHORTCUTS.map((s) => (
-                <tr
-                  key={s.keys}
-                  style={{ borderBottom: "1px solid #EBEBEB" }}
-                >
-                  <td style={{ padding: "10px 24px" }}>
-                    <kbd
-                      style={{
-                        display: "inline-block",
-                        padding: "2px 8px",
-                        borderRadius: 4,
-                        border: "1px solid #EBEBEB",
-                        backgroundColor: "var(--color-surface)",
-                        fontSize: "var(--text-xs)",
-                        fontFamily: "'IBM Plex Sans', sans-serif",
-                        color: "var(--color-foreground)",
-                      }}
-                    >
-                      {s.keys}
-                    </kbd>
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px 24px",
-                      color: "var(--color-foreground)",
-                    }}
-                  >
-                    {s.action}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   );
 }

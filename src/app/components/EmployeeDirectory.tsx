@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import {
-  Plus, Upload, Download, X, Users, AlertCircle,
+  Plus, Upload, Download, X, Users, AlertCircle, Search,
   Mail, Phone, MapPin, Calendar, Trash2, Pencil, Save, Loader2, Check
 } from "lucide-react";
 import { toast } from "sonner";
 import * as api from "../utils/api";
 import { formatINR, parseINR, deriveBenefitPlan, deriveBracketLabel, getInitials } from "../utils/helpers";
-import { useSearch } from "../contexts/SearchContext";
-import { AVATAR_COLORS, type Employee, type Claim, type TaxRegime } from "../types";
+import { AVATAR_COLORS, BENEFIT_PLANS, type Employee, type Claim, type TaxRegime, type BenefitPlan } from "../types";
 import { BandAssignmentView } from "./employees/BandAssignmentView";
 import { DEMO_EMPLOYEES, DEMO_CLAIMS } from "../utils/demoData";
 
@@ -97,7 +96,7 @@ function ProfileSkeleton() {
 }
 
 export function EmployeeDirectory() {
-  const { query } = useSearch();
+  const [query, setQuery] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -133,7 +132,8 @@ export function EmployeeDirectory() {
 
   // Add form
   const [formName, setFormName] = useState("");
-  const [formDesignation, setFormDesignation] = useState("");
+  const [formPhone, setFormPhone] = useState("");
+  const [formBand, setFormBand] = useState<BenefitPlan | "">("");
   const [formEmail, setFormEmail] = useState("");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -198,13 +198,16 @@ export function EmployeeDirectory() {
   const validateAddForm = () => {
     const errs: Record<string, string> = {};
     if (!formName.trim()) errs.name = "Name is required";
-    if (!formDesignation.trim()) errs.designation = "Designation is required";
+    if (!formPhone.trim()) errs.phone = "Phone number is required";
+    else if (!/^\d{10,15}$/.test(formPhone.replace(/\s+/g, ""))) errs.phone = "Enter a valid phone number";
+    if (!formBand) errs.band = "Policy band is required";
+    if (!formEmail.trim()) errs.email = "Email is required";
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
   const clearAddForm = () => {
-    setFormName(""); setFormDesignation("");
+    setFormName(""); setFormPhone(""); setFormBand("");
     setFormEmail(""); setFormErrors({});
   };
 
@@ -214,9 +217,13 @@ export function EmployeeDirectory() {
     const color = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
     try {
       const res = await api.createEmployee({
-        name: formName, designation: formDesignation,
+        name: formName,
+        designation: formBand,
+        benefitPlan: formBand as BenefitPlan,
+        bracket: deriveBracketLabel(0),
         initials: getInitials(formName), color, status: "active",
         email: formEmail,
+        phone: formPhone,
       } as any);
       setEmployees(prev => [...prev, res.data]);
       setShowAddModal(false);
@@ -420,18 +427,33 @@ export function EmployeeDirectory() {
             </div>
             <div>
               <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Designation *
+                Phone Number *
               </label>
-              <input style={{ ...inputStyle, marginTop: "var(--space-1)", borderColor: formErrors.designation ? "var(--brand-red)" : undefined }} value={formDesignation}
-                onChange={e => setFormDesignation(e.target.value)} placeholder="e.g. Software Engineer" />
-              {formErrors.designation && <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>{formErrors.designation}</p>}
+              <input style={{ ...inputStyle, marginTop: "var(--space-1)", borderColor: formErrors.phone ? "var(--brand-red)" : undefined }} value={formPhone}
+                onChange={e => setFormPhone(e.target.value)} placeholder="e.g. 9876543210" type="tel" />
+              {formErrors.phone && <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>{formErrors.phone}</p>}
             </div>
             <div>
               <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Email
+                Policy Band *
               </label>
-              <input style={{ ...inputStyle, marginTop: "var(--space-1)" }} value={formEmail}
+              <select
+                style={{ ...inputStyle, marginTop: "var(--space-1)", borderColor: formErrors.band ? "var(--brand-red)" : undefined }}
+                value={formBand}
+                onChange={e => setFormBand(e.target.value as BenefitPlan)}
+              >
+                <option value="">Select a policy band…</option>
+                {BENEFIT_PLANS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+              {formErrors.band && <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>{formErrors.band}</p>}
+            </div>
+            <div>
+              <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Email *
+              </label>
+              <input style={{ ...inputStyle, marginTop: "var(--space-1)", borderColor: formErrors.email ? "var(--brand-red)" : undefined }} value={formEmail}
                 onChange={e => setFormEmail(e.target.value)} placeholder="e.g. priya@acme.com" type="email" />
+              {formErrors.email && <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--brand-red)" }}>{formErrors.email}</p>}
             </div>
             <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
               <button style={btnGhost} onClick={() => { setShowAddModal(false); setFormErrors({}); }}>Cancel</button>
@@ -831,6 +853,18 @@ export function EmployeeDirectory() {
           </button>
         </div>
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleCSVImport} />
+      </div>
+
+      {/* Local Search */}
+      <div style={{ position: "relative", marginBottom: "var(--space-4)", maxWidth: 360 }}>
+        <Search size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--color-muted-foreground)" }} />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by name, email, designation…"
+          style={{ ...inputStyle, paddingLeft: 36 }}
+        />
       </div>
 
       {/* Tab Navigation */}
