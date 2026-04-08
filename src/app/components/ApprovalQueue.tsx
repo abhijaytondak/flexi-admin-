@@ -169,6 +169,11 @@ export function ApprovalQueue() {
   const [returnToLimit, setReturnToLimit] = useState(true);
   const [rejectLoading, setRejectLoading] = useState(false);
 
+  // Cancel approval dialog (used in Auto Approved tab)
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -251,6 +256,27 @@ export function ApprovalQueue() {
     setRejectReason("");
     setReturnToLimit(true);
     setShowRejectDialog(true);
+  };
+
+  // Cancel approval (Auto Approved tab)
+  const openCancelDialog = () => {
+    setCancelReason("");
+    setShowCancelDialog(true);
+  };
+
+  const confirmCancelApproval = async () => {
+    if (!selectedClaim || !cancelReason) return;
+    setCancelLoading(true);
+    await new Promise(r => setTimeout(r, 500));
+    setClaims(prev => prev.map(c => c.id === selectedClaim.id
+      ? { ...c, status: "rejected" as ClaimStatus, actionNote: `Approval cancelled: ${cancelReason}`, actionTimestamp: new Date().toISOString(), actionBy: "Amanda Johnson" }
+      : c));
+    toast.success("Auto-approval cancelled");
+    setShowCancelDialog(false);
+    setCancelReason("");
+    setSelectedClaim(null);
+    setActionNote("");
+    setCancelLoading(false);
   };
 
   // Confirm rejection with reason — local state only for demo
@@ -466,6 +492,7 @@ export function ApprovalQueue() {
         </div>
         <div style={{ display: "flex", gap: "var(--space-3)" }}>
           {(() => {
+            if (approvalTab !== "pending") return null;
             const pendingInView = filtered.filter(c => PENDING_STATUSES.includes(c.status)).length;
             if (pendingInView === 0) return null;
             return (
@@ -604,7 +631,7 @@ export function ApprovalQueue() {
       )}
 
       {/* Select All */}
-      {filtered.length > 0 && (
+      {approvalTab === "pending" && filtered.length > 0 && (
         <label style={{
           display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
           marginBottom: "var(--space-3)", fontSize: "var(--text-sm)",
@@ -685,9 +712,11 @@ export function ApprovalQueue() {
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                      <span onClick={e => { e.stopPropagation(); toggleSelectGroup(groupClaims); }} style={{ display: "flex", alignItems: "center" }}>
-                        <input type="checkbox" checked={allGroupSelected} onChange={() => toggleSelectGroup(groupClaims)} style={{ cursor: "pointer", width: 16, height: 16 }} />
-                      </span>
+                      {approvalTab === "pending" && (
+                        <span onClick={e => { e.stopPropagation(); toggleSelectGroup(groupClaims); }} style={{ display: "flex", alignItems: "center" }}>
+                          <input type="checkbox" checked={allGroupSelected} onChange={() => toggleSelectGroup(groupClaims)} style={{ cursor: "pointer", width: 16, height: 16 }} />
+                        </span>
+                      )}
                       {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                       <div style={{
                         width: 36, height: 36, borderRadius: "var(--rounded-full)",
@@ -746,8 +775,10 @@ export function ApprovalQueue() {
                             onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
                           >
                             <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
-                              onClick={e => { e.stopPropagation(); toggleSelect(claim.id); }}>
-                              <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(claim.id)} style={{ cursor: "pointer", width: 16, height: 16 }} />
+                              onClick={e => { e.stopPropagation(); if (approvalTab === "pending") toggleSelect(claim.id); }}>
+                              {approvalTab === "pending" && (
+                                <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(claim.id)} style={{ cursor: "pointer", width: 16, height: 16 }} />
+                              )}
                             </span>
                             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
@@ -1000,30 +1031,48 @@ export function ApprovalQueue() {
             </div>
 
             {/* Drawer Footer */}
-            {(selectedClaim.status === "pending" || selectedClaim.status === "submitted" || selectedClaim.status === "claimed" || selectedClaim.status === "invoice_pending") && (
-              <div style={{
-                display: "flex", gap: "var(--space-3)", padding: "var(--space-4) var(--space-5)",
-                borderTop: "1px solid var(--color-border)",
-              }}>
-                <button style={{
-                  ...btnPrimary, flex: 1, justifyContent: "center",
-                  backgroundColor: "var(--brand-red)",
-                  opacity: actionLoading ? 0.7 : 1,
-                }} onClick={openRejectDialog} disabled={actionLoading}
-                  onMouseEnter={e => { if (!actionLoading) e.currentTarget.style.backgroundColor = "#c0392b"; }}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-red)"}>
-                  {actionLoading ? <Spinner size={16} /> : <XCircle size={16} />} Reject
-                </button>
-                <button style={{
-                  ...btnPrimary, flex: 1, justifyContent: "center",
-                  backgroundColor: "var(--brand-green)",
-                  opacity: actionLoading ? 0.7 : 1,
-                }} onClick={handleApprove} disabled={actionLoading}
-                  onMouseEnter={e => { if (!actionLoading) e.currentTarget.style.backgroundColor = "#219a52"; }}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-green)"}>
-                  {actionLoading ? <Spinner size={16} /> : <CheckCircle size={16} />} Approve
-                </button>
-              </div>
+            {approvalTab === "auto" ? (
+              selectedClaim.status !== "rejected" && (
+                <div style={{
+                  display: "flex", gap: "var(--space-3)", padding: "var(--space-4) var(--space-5)",
+                  borderTop: "1px solid var(--color-border)",
+                }}>
+                  <button style={{
+                    ...btnPrimary, flex: 1, justifyContent: "center",
+                    backgroundColor: "var(--brand-red)",
+                  }} onClick={openCancelDialog}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#c0392b")}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = "var(--brand-red)")}>
+                    <XCircle size={16} /> Cancel Approval
+                  </button>
+                </div>
+              )
+            ) : (
+              (selectedClaim.status === "pending" || selectedClaim.status === "submitted" || selectedClaim.status === "claimed" || selectedClaim.status === "invoice_pending") && (
+                <div style={{
+                  display: "flex", gap: "var(--space-3)", padding: "var(--space-4) var(--space-5)",
+                  borderTop: "1px solid var(--color-border)",
+                }}>
+                  <button style={{
+                    ...btnPrimary, flex: 1, justifyContent: "center",
+                    backgroundColor: "var(--brand-red)",
+                    opacity: actionLoading ? 0.7 : 1,
+                  }} onClick={openRejectDialog} disabled={actionLoading}
+                    onMouseEnter={e => { if (!actionLoading) e.currentTarget.style.backgroundColor = "#c0392b"; }}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-red)"}>
+                    {actionLoading ? <Spinner size={16} /> : <XCircle size={16} />} Reject
+                  </button>
+                  <button style={{
+                    ...btnPrimary, flex: 1, justifyContent: "center",
+                    backgroundColor: "var(--brand-green)",
+                    opacity: actionLoading ? 0.7 : 1,
+                  }} onClick={handleApprove} disabled={actionLoading}
+                    onMouseEnter={e => { if (!actionLoading) e.currentTarget.style.backgroundColor = "#219a52"; }}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-green)"}>
+                    {actionLoading ? <Spinner size={16} /> : <CheckCircle size={16} />} Approve
+                  </button>
+                </div>
+              )
             )}
           </div>
         </>
@@ -1120,6 +1169,69 @@ export function ApprovalQueue() {
               >
                 {rejectLoading ? <Spinner size={16} /> : <XCircle size={16} />}
                 Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Cancel Approval Dialog */}
+      {showCancelDialog && selectedClaim && (
+        <>
+          <div style={{
+            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1100,
+          }} onClick={() => { setShowCancelDialog(false); setCancelReason(""); }} />
+          <div style={{
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            width: 440, maxWidth: "90vw", backgroundColor: "var(--color-card)",
+            borderRadius: "var(--rounded-lg)", boxShadow: "var(--elevation-lg)", zIndex: 1200,
+            padding: "var(--space-6)", ...font,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+              <h3 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                Cancel Auto-Approval
+              </h3>
+              <button style={{ background: "none", border: "none", cursor: "pointer" }}
+                onClick={() => { setShowCancelDialog(false); setCancelReason(""); }}>
+                <X size={20} style={{ color: "var(--color-muted-foreground)" }} />
+              </button>
+            </div>
+
+            <p style={{ margin: "0 0 var(--space-4)", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
+              This claim was auto-approved. Provide a reason to cancel the approval — the employee will be notified.
+            </p>
+
+            <div style={{ marginBottom: "var(--space-5)" }}>
+              <label style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Reason <span style={{ color: "var(--brand-red)" }}>*</span>
+              </label>
+              <select
+                style={{ ...inputStyle, marginTop: "var(--space-2)" }}
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                autoFocus
+              >
+                <option value="">Select a reason…</option>
+                <option value="Duplicate claim">Duplicate claim</option>
+                <option value="Invalid or fraudulent receipt">Invalid or fraudulent receipt</option>
+                <option value="Policy violation">Policy violation</option>
+                <option value="Wrong category">Wrong category</option>
+                <option value="Employee left company">Employee left company</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>
+              <button style={btnGhost}
+                onClick={() => { setShowCancelDialog(false); setCancelReason(""); }}
+                disabled={cancelLoading}>
+                Keep Approved
+              </button>
+              <button style={{
+                ...btnPrimary, backgroundColor: "var(--brand-red)",
+                opacity: (!cancelReason || cancelLoading) ? 0.6 : 1,
+              }} onClick={confirmCancelApproval} disabled={!cancelReason || cancelLoading}>
+                {cancelLoading ? <Spinner size={14} /> : <XCircle size={14} />} Cancel Approval
               </button>
             </div>
           </div>
