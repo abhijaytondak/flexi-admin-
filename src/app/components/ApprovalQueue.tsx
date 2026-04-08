@@ -34,6 +34,15 @@ const inputStyle: CSSProperties = {
 
 const STATUS_FILTERS = ["All", "Pending", "Approved", "Rejected"] as const;
 
+/** Claims below this amount are auto-approved by the system.
+ *  Anything ≥ this requires manual review in the Pending Approval tab. */
+const AUTO_APPROVE_THRESHOLD = 70000;
+
+/** Date after which any still-unapproved claim is auto-approved. */
+const AUTO_APPROVE_CUTOFF = "2026-03-31";
+
+type ApprovalTab = "auto" | "pending";
+
 const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: any }> = {
   pending: { color: "var(--brand-amber)", bg: "var(--brand-amber-light)", icon: Clock },
   submitted: { color: "var(--brand-amber)", bg: "var(--brand-amber-light)", icon: Clock },
@@ -139,6 +148,7 @@ export function ApprovalQueue() {
   const [setupRequired, setSetupRequired] = useState(false);
 
   // Filters
+  const [approvalTab, setApprovalTab] = useState<ApprovalTab>("pending");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [categoryFilter, setCategoryFilter] = useState<string>("All");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -361,7 +371,13 @@ export function ApprovalQueue() {
 
   // Filter logic
   const departments = Array.from(new Set(claims.map(c => c.department).filter(Boolean)));
-  let filtered = claims;
+
+  // Split claims into auto-approved (< threshold) vs needs manual review (≥ threshold)
+  const needsManualReview = (c: Claim) => parseINR(c.claimAmount) >= AUTO_APPROVE_THRESHOLD;
+  const autoApprovedClaims = claims.filter(c => !needsManualReview(c));
+  const pendingApprovalClaims = claims.filter(c => needsManualReview(c));
+
+  let filtered = approvalTab === "auto" ? autoApprovedClaims : pendingApprovalClaims;
 
   if (statusFilter !== "All") {
     filtered = filtered.filter(c => c.status.toLowerCase() === statusFilter.toLowerCase());
@@ -478,30 +494,49 @@ export function ApprovalQueue() {
         />
       </div>
 
-      {/* Submission Deadline Banner */}
-      {(() => {
-        const deadline = new Date("2026-03-31");
-        const now = new Date();
-        const diffMs = deadline.getTime() - now.getTime();
-        const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-        const isUrgent = daysRemaining <= 7;
-        return (
-          <div style={{
-            display: "flex", alignItems: "center", gap: "var(--space-3)",
-            padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-4)",
-            backgroundColor: isUrgent ? "#FFF3E0" : "#FFF8E1",
-            border: `1px solid ${isUrgent ? "#FFB74D" : "#FFE082"}`,
-            borderRadius: "var(--rounded-md)",
-            animation: isUrgent ? "deadlinePulse 2s ease-in-out infinite" : "none",
-          }}>
-            <style>{`@keyframes deadlinePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }`}</style>
-            <span style={{ fontSize: "var(--text-base)" }}>&#9200;</span>
-            <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "#E65100" }}>
-              Submission deadline: March 31, 2026 — {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} remaining
-            </span>
-          </div>
-        );
-      })()}
+      {/* Auto-Approval Notice Banner */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "var(--space-3)",
+        padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-4)",
+        backgroundColor: "#FFF8E1",
+        border: "1px solid #FFE082",
+        borderRadius: "var(--rounded-md)",
+      }}>
+        <span style={{ fontSize: "var(--text-base)" }}>&#9200;</span>
+        <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "#E65100" }}>
+          After {new Date(AUTO_APPROVE_CUTOFF).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}, all remaining unapproved claims will be auto-approved.
+        </span>
+      </div>
+
+      {/* Approval Tabs */}
+      <div style={{
+        display: "flex", gap: 0, marginBottom: "var(--space-4)",
+        borderBottom: "1px solid var(--color-border)",
+      }}>
+        {([
+          { key: "pending" as const, label: `Pending Approval (${pendingApprovalClaims.length})` },
+          { key: "auto" as const, label: `Auto Approved (${autoApprovedClaims.length})` },
+        ]).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => { setApprovalTab(tab.key); setSelectedIds(new Set()); }}
+            style={{
+              ...font,
+              padding: "10px 20px",
+              fontSize: "var(--text-sm)",
+              fontWeight: approvalTab === tab.key ? 600 : 500,
+              color: approvalTab === tab.key ? "var(--brand-accent)" : "var(--color-muted-foreground)",
+              backgroundColor: "transparent",
+              border: "none",
+              borderBottom: approvalTab === tab.key ? "2px solid var(--brand-accent)" : "2px solid transparent",
+              cursor: "pointer",
+              transition: "color 150ms, border-color 150ms",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       {/* Status Pills */}
       <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-4)", flexWrap: "wrap" }}>
