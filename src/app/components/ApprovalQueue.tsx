@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, type CSSProperties } from "rea
 import {
   Check, X, ChevronDown, ChevronRight, Filter, AlertCircle,
   Clock, CheckCircle, XCircle, FileText, Loader2,
-  Eye, Search, Image as ImageIcon
+  Search, Image as ImageIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { parseINR } from "../utils/helpers";
@@ -969,11 +969,6 @@ export function ApprovalQueue() {
                       </p>
                     </div>
                   </div>
-                  {selectedClaim.upiScreenshot && (
-                    <button style={{ ...btnGhost, marginTop: "var(--space-2)", gap: 6 }} onClick={e => e.stopPropagation()}>
-                      <Eye size={14} /> View UPI Screenshot
-                    </button>
-                  )}
                 </div>
               )}
 
