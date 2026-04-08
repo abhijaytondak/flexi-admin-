@@ -32,8 +32,6 @@ const inputStyle: CSSProperties = {
   color: "var(--color-foreground)", outline: "none",
 };
 
-const STATUS_FILTERS = ["All", "Pending", "Approved", "Rejected"] as const;
-
 /** Claims below this amount are auto-approved by the system.
  *  Anything ≥ this requires manual review in the Pending Approval tab. */
 const AUTO_APPROVE_THRESHOLD = 70000;
@@ -41,7 +39,7 @@ const AUTO_APPROVE_THRESHOLD = 70000;
 /** Date after which any still-unapproved claim is auto-approved. */
 const AUTO_APPROVE_CUTOFF = "2026-03-31";
 
-type ApprovalTab = "auto" | "pending";
+type ApprovalTab = "auto" | "pending" | "rejected";
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: any }> = {
   pending: { color: "var(--brand-amber)", bg: "var(--brand-amber-light)", icon: Clock },
@@ -149,7 +147,6 @@ export function ApprovalQueue() {
 
   // Filters
   const [approvalTab, setApprovalTab] = useState<ApprovalTab>("pending");
-  const [statusFilter, setStatusFilter] = useState<string>("All");
   const [categoryFilter, setCategoryFilter] = useState<string>("All");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [deptFilter, setDeptFilter] = useState("");
@@ -398,16 +395,16 @@ export function ApprovalQueue() {
   // Filter logic
   const departments = Array.from(new Set(claims.map(c => c.department).filter(Boolean)));
 
-  // Split claims into auto-approved (< threshold) vs needs manual review (≥ threshold)
+  // Split claims into auto-approved (< threshold, not rejected), pending manual review (≥ threshold, not rejected), and rejected
   const needsManualReview = (c: Claim) => parseINR(c.claimAmount) >= AUTO_APPROVE_THRESHOLD;
-  const autoApprovedClaims = claims.filter(c => !needsManualReview(c));
-  const pendingApprovalClaims = claims.filter(c => needsManualReview(c));
+  const rejectedClaims = claims.filter(c => c.status === "rejected");
+  const autoApprovedClaims = claims.filter(c => c.status !== "rejected" && !needsManualReview(c));
+  const pendingApprovalClaims = claims.filter(c => c.status !== "rejected" && needsManualReview(c));
 
-  let filtered = approvalTab === "auto" ? autoApprovedClaims : pendingApprovalClaims;
-
-  if (statusFilter !== "All") {
-    filtered = filtered.filter(c => c.status.toLowerCase() === statusFilter.toLowerCase());
-  }
+  let filtered =
+    approvalTab === "auto" ? autoApprovedClaims :
+    approvalTab === "rejected" ? rejectedClaims :
+    pendingApprovalClaims;
   if (categoryFilter !== "All") {
     filtered = filtered.filter(c => c.benefitType === categoryFilter);
   }
@@ -543,6 +540,7 @@ export function ApprovalQueue() {
         {([
           { key: "pending" as const, label: `Pending Approval (${pendingApprovalClaims.length})` },
           { key: "auto" as const, label: `Auto Approved (${autoApprovedClaims.length})` },
+          { key: "rejected" as const, label: `Rejected (${rejectedClaims.length})` },
         ]).map(tab => (
           <button
             key={tab.key}
@@ -565,21 +563,8 @@ export function ApprovalQueue() {
         ))}
       </div>
 
-      {/* Status Pills */}
-      <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-4)", flexWrap: "wrap" }}>
-        {STATUS_FILTERS.map(s => (
-          <button key={s} onClick={() => setStatusFilter(s)} style={{
-            ...font, padding: "var(--space-1) var(--space-4)",
-            borderRadius: "var(--rounded-full)", fontSize: "var(--text-sm)", fontWeight: 500,
-            border: "1px solid var(--color-border)", cursor: "pointer",
-            backgroundColor: statusFilter === s ? "var(--brand-accent)" : "transparent",
-            color: statusFilter === s ? "#fff" : "var(--color-muted-foreground)",
-            transition: "all 150ms",
-          }}>
-            {s}
-          </button>
-        ))}
-        <div style={{ width: 1, backgroundColor: "var(--color-border)", margin: "0 var(--space-2)" }} />
+      {/* Filters */}
+      <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-4)", flexWrap: "wrap", alignItems: "center" }}>
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
