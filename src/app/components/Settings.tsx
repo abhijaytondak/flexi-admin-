@@ -33,11 +33,7 @@ const sectionCard: CSSProperties = {
 
 const TABS = [
   { id: "profile", label: "Profile", icon: User },
-  { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "notifications", label: "Notifications", icon: Bell },
   { id: "workflow", label: "Workflow", icon: GitBranch },
-  { id: "security", label: "Security", icon: Shield },
-  { id: "data", label: "Data", icon: Database },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
@@ -373,101 +369,6 @@ export function Settings() {
           </div>
         );
 
-      case "appearance":
-        return (
-          <div>
-            <h3 style={{ margin: "0 0 var(--space-5)", fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
-              Appearance
-            </h3>
-
-            <div style={{ marginBottom: "var(--space-6)" }}>
-              <h4 style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
-                Dashboard Cards
-              </h4>
-              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
-                Choose which KPI cards appear on the dashboard
-              </p>
-              {[
-                { key: "totalBenefitOutgo" as const, label: "Total Benefit Outgo", desc: "Shows total benefits disbursed" },
-                { key: "avgTaxSaved" as const, label: "Avg Tax Saved", desc: "Average tax savings per employee" },
-                { key: "pendingApprovals" as const, label: "Pending Approvals", desc: "Number of claims awaiting review" },
-                { key: "activeEmployees" as const, label: "Active Employees", desc: "Count of active employees" },
-              ].map(card => (
-                renderToggleRow(card.label, card.desc, profile.dashboardCards[card.key], () => toggleDashboardCard(card.key))
-              ))}
-            </div>
-
-            {renderField("Fiscal Year Start",
-              <select style={inputStyle} value={profile.fiscalYearStart}
-                onChange={e => { updateProfile({ fiscalYearStart: e.target.value }); markDirty("appearance"); }}>
-                {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            )}
-
-            {renderToggleRow("Show Greeting", "Display time-based greeting on dashboard",
-              profile.showGreeting, () => { updateProfile({ showGreeting: !profile.showGreeting }); markDirty("appearance"); }
-            )}
-
-            {renderSaveButton()}
-          </div>
-        );
-
-      case "notifications":
-        return (
-          <div>
-            <h3 style={{ margin: "0 0 var(--space-5)", fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
-              Notifications
-            </h3>
-
-            <div style={{ marginBottom: "var(--space-6)" }}>
-              <h4 style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
-                Channels
-              </h4>
-              {renderToggleRow("Email Notifications", "Receive notifications via email",
-                settings.emailEnabled, () => updateSetting("emailEnabled", !settings.emailEnabled)
-              )}
-              {renderToggleRow("Slack Notifications", "Receive notifications in Slack",
-                settings.slackEnabled, () => updateSetting("slackEnabled", !settings.slackEnabled)
-              )}
-            </div>
-
-            {/* Divider */}
-            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-4) 0" }} />
-
-            {renderField("Digest Frequency",
-              <select style={inputStyle} value={settings.digestFrequency}
-                onChange={e => updateSetting("digestFrequency", e.target.value)}>
-                {DIGEST_OPTIONS.map(d => (
-                  <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
-                ))}
-              </select>
-            )}
-
-            {/* Divider */}
-            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-4) 0" }} />
-
-            <div style={{ marginTop: "var(--space-4)" }}>
-              <h4 style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
-                Event Subscriptions
-              </h4>
-              {renderToggleRow("New Claim Submitted", "Notify when an employee submits a new claim",
-                settings.notifyOnClaim, () => updateSetting("notifyOnClaim", !settings.notifyOnClaim)
-              )}
-              {renderToggleRow("Claim Approved/Rejected", "Notify when a claim status changes",
-                settings.notifyOnApproval, () => updateSetting("notifyOnApproval", !settings.notifyOnApproval)
-              )}
-              {renderToggleRow("New Employee Added", "Notify when a new employee is onboarded",
-                settings.notifyOnNewEmployee, () => updateSetting("notifyOnNewEmployee", !settings.notifyOnNewEmployee)
-              )}
-              {renderToggleRow("Policy Changes", "Notify when policy brackets are modified",
-                settings.notifyOnPolicyChange, () => updateSetting("notifyOnPolicyChange", !settings.notifyOnPolicyChange)
-              )}
-            </div>
-
-            {renderSaveButton()}
-          </div>
-        );
-
       case "workflow":
         return (
           <div>
@@ -520,74 +421,6 @@ export function Settings() {
                   onChange={e => updateSetting("escalationHours", Number(e.target.value))} />
                 <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
                   Pending claims older than this are escalated to senior admins.
-                </p>
-              </div>
-            )}
-
-            {renderSaveButton()}
-          </div>
-        );
-
-      case "security":
-        return (
-          <div>
-            <h3 style={{ margin: "0 0 var(--space-5)", fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
-              Security
-            </h3>
-
-            {renderToggleRow("Two-Factor Authentication", "Require 2FA for admin sign-in",
-              settings.twoFactorEnabled, () => updateSetting("twoFactorEnabled", !settings.twoFactorEnabled)
-            )}
-
-            {/* Divider */}
-            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-4) 0" }} />
-
-            <div style={{ marginTop: "var(--space-4)" }}>
-              {renderField("Session Timeout (Minutes)",
-                <div>
-                  <input type="number" style={inputStyle} value={settings.sessionTimeout}
-                    onChange={e => updateSetting("sessionTimeout", Number(e.target.value))} />
-                  <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
-                    Automatically sign out after this period of inactivity.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {renderSaveButton()}
-          </div>
-        );
-
-      case "data":
-        return (
-          <div>
-            <h3 style={{ margin: "0 0 var(--space-5)", fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
-              Data Management
-            </h3>
-
-            {renderField("Export Format",
-              <select style={inputStyle} value={settings.exportFormat}
-                onChange={e => updateSetting("exportFormat", e.target.value)}>
-                <option value="pdf">PDF</option>
-                <option value="csv">CSV</option>
-                <option value="excel">Excel</option>
-              </select>
-            )}
-
-            {/* Divider */}
-            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-4) 0" }} />
-
-            {renderField("Data Retention",
-              <div>
-                <select style={inputStyle} value={settings.dataRetention}
-                  onChange={e => updateSetting("dataRetention", e.target.value)}>
-                  <option value="1year">1 Year</option>
-                  <option value="2years">2 Years</option>
-                  <option value="5years">5 Years</option>
-                  <option value="unlimited">Unlimited</option>
-                </select>
-                <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
-                  How long to retain claims and payroll data before archiving.
                 </p>
               </div>
             )}
