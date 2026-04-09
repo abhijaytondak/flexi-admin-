@@ -139,14 +139,8 @@ export function Settings() {
         updateProfile({ avatarColor: previewAvatarColor });
         await saveProfile({ avatarColor: previewAvatarColor });
         toast.success("Profile updated");
-      } else if (activeTab === "appearance") {
-        await saveProfile({ dashboardCards: profile.dashboardCards, fiscalYearStart: profile.fiscalYearStart, showGreeting: profile.showGreeting });
-        toast.success("Appearance updated");
       } else {
         await api.saveSettings(settings);
-        if (activeTab === "data") {
-          await saveProfile({ exportFormat: settings.exportFormat as any, dataRetention: settings.dataRetention as any });
-        }
         toast.success("Settings saved");
       }
       clearDirty(activeTab);
@@ -204,22 +198,7 @@ export function Settings() {
 
   const updateSetting = (key: string, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
-    // Determine which tab this setting belongs to
-    const notifKeys = ["emailEnabled", "slackEnabled", "digestFrequency", "notifyOnClaim", "notifyOnApproval", "notifyOnNewEmployee", "notifyOnPolicyChange"];
-    const workflowKeys = ["autoApproveEnabled", "autoApproveThreshold", "escalationHours"];
-    const securityKeys = ["twoFactorEnabled", "sessionTimeout"];
-    const dataKeys = ["exportFormat", "dataRetention"];
-    if (notifKeys.includes(key)) markDirty("notifications");
-    else if (workflowKeys.includes(key)) markDirty("workflow");
-    else if (securityKeys.includes(key)) markDirty("security");
-    else if (dataKeys.includes(key)) markDirty("data");
-  };
-
-  const toggleDashboardCard = (key: keyof DashboardCards) => {
-    updateProfile({
-      dashboardCards: { ...profile.dashboardCards, [key]: !profile.dashboardCards[key] },
-    });
-    markDirty("appearance");
+    markDirty("workflow");
   };
 
   const renderToggle = (value: boolean, onChange: () => void) => (
