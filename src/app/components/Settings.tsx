@@ -475,21 +475,41 @@ export function Settings() {
               Workflow Settings
             </h3>
 
-            {renderToggleRow("Auto-Approve Claims", "Automatically approve claims below a specified bill amount",
-              settings.autoApproveEnabled, () => updateSetting("autoApproveEnabled", !settings.autoApproveEnabled)
-            )}
-
-            {settings.autoApproveEnabled && (
-              renderField("Auto-Approve for Bill Amount Less Than (INR)",
+            <div style={{
+              padding: "var(--space-4)", backgroundColor: "var(--color-background)",
+              borderRadius: "var(--rounded-md)", border: "1px solid var(--color-border)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-3)" }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: "50%",
+                  backgroundColor: "var(--brand-green)",
+                }} />
+                <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                  Auto-Approve is ON
+                </span>
+              </div>
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "var(--space-3)", backgroundColor: "var(--color-card)",
+                borderRadius: "var(--rounded-md)", border: "1px solid var(--color-border)",
+              }}>
                 <div>
-                  <input type="number" style={inputStyle} value={settings.autoApproveThreshold}
-                    onChange={e => updateSetting("autoApproveThreshold", Number(e.target.value))} />
-                  <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
-                    Claims below this amount will be auto-approved.
+                  <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)" }}>
+                    Auto-Approve Limit
+                  </p>
+                  <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                    Claims below this amount are automatically approved
                   </p>
                 </div>
-              )
-            )}
+                <span style={{
+                  fontSize: "var(--text-base)", fontWeight: 700, color: "var(--brand-green)",
+                  backgroundColor: "#D1FAE5", padding: "var(--space-1) var(--space-3)",
+                  borderRadius: "var(--rounded-md)", border: "1px solid #6EE7B7",
+                }}>
+                  ₹{settings.autoApproveThreshold.toLocaleString("en-IN")}
+                </span>
+              </div>
+            </div>
 
             {/* Divider */}
             <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-4) 0" }} />
