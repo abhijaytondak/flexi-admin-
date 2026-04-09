@@ -10,6 +10,7 @@ const EmployeeDirectory = lazy(() => import("./components/EmployeeDirectory").th
 const PayrollExport     = lazy(() => import("./components/payroll/PayrollExport").then(m => ({ default: m.PayrollExport })));
 const OnboardingWizard  = lazy(() => import("./components/onboarding/OnboardingWizard").then(m => ({ default: m.OnboardingWizard })));
 const HelpCenter        = lazy(() => import("./components/HelpCenter").then(m => ({ default: m.HelpCenter })));
+const Settings          = lazy(() => import("./components/Settings").then(m => ({ default: m.Settings })));
 
 export const router = createBrowserRouter([
   {
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
       { path: "payroll", Component: PayrollExport },
       { path: "employees", Component: EmployeeDirectory },
       { path: "onboarding", Component: OnboardingWizard },
+      { path: "settings", Component: Settings },
       { path: "help", Component: HelpCenter },
       { path: "*", Component: NotFound },
     ],

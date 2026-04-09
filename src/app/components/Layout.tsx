@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   LogOut,
+  Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import { UserProfileProvider, useUserProfile } from "../contexts/UserProfileContext";
@@ -59,6 +60,13 @@ const MAIN_NAV_ITEMS = [
     iconBg: "var(--icon-employees-bg)",
     iconFg: "var(--icon-employees-fg)",
   },
+  {
+    path: "/settings",
+    label: "Settings",
+    icon: Settings,
+    iconBg: "var(--icon-help-bg)",
+    iconFg: "var(--icon-help-fg)",
+  },
 ] as const;
 
 // Combined for route matching
@@ -69,6 +77,7 @@ function getPageTitle(pathname: string): string {
   const item = NAV_ITEMS.find((n) => n.path === pathname);
   if (item) return item.label;
   if (pathname === "/onboarding") return "Onboarding";
+  if (pathname === "/settings") return "Settings";
   if (pathname === "/help") return "Help Center";
   return "SalarySe";
 }
