@@ -1,0 +1,261 @@
+import { useState, useCallback, useMemo } from "react";
+import type { BenefitPlan } from "@partner-portal/shared";
+
+// ─── Step Definitions ────────────────────────────────────────────────────────
+
+export type OnboardingStep =
+  | "CompanyProfile"
+  | "SalaryStructure"
+  | "BenefitPolicy"
+  | "EmployeeImport"
+  | "ReviewPublish";
+
+export const STEPS: OnboardingStep[] = [
+  "CompanyProfile",
+  "SalaryStructure",
+  "BenefitPolicy",
+  "EmployeeImport",
+  "ReviewPublish",
+];
+
+export const STEP_LABELS: Record<OnboardingStep, string> = {
+  CompanyProfile: "Company Profile",
+  SalaryStructure: "Salary Structure",
+  BenefitPolicy: "Benefit Policy",
+  EmployeeImport: "Employee Import",
+  ReviewPublish: "Review & Publish",
+};
+
+// ─── Step Data Interfaces ────────────────────────────────────────────────────
+
+export interface CompanyProfileData {
+  companyName: string;
+  industry: string;
+  companySize: string;
+  fiscalYearStart: string;
+  payrollDay: number;
+  hrAdminName: string;
+  hrAdminEmail: string;
+  hrAdminPhone: string;
+  hrAdminDesignation: string;
+}
+
+export interface SalaryComponent {
+  key: string;
+  label: string;
+  percent: number;
+  inclusion: boolean;
+  optional: boolean;
+}
+
+export interface SalaryStructureData {
+  components: SalaryComponent[];
+  sampleCtc: number;
+}
+
+export interface BenefitCategoryRow {
+  id: string;
+  name: string;
+  enabled: boolean;
+  monthlyLimit: number;
+  billRequired: boolean;
+  carryForward: boolean;
+}
+
+export interface BenefitPolicyData {
+  Associate: BenefitCategoryRow[];
+  "Senior Associate": BenefitCategoryRow[];
+  Manager: BenefitCategoryRow[];
+  "Senior Manager": BenefitCategoryRow[];
+  AVP: BenefitCategoryRow[];
+  VP: BenefitCategoryRow[];
+}
+
+export interface ImportedEmployee {
+  name: string;
+  email: string;
+  department: string;
+  designation: string;
+  annualCtc: number;
+  band: BenefitPlan;
+  valid: boolean;
+  errors: string[];
+}
+
+export interface EmployeeImportData {
+  employees: ImportedEmployee[];
+  fileName: string;
+  skipped: boolean;
+}
+
+export interface ReviewPublishData {
+  checklist: {
+    companyVerified: boolean;
+    salaryVerified: boolean;
+    benefitsVerified: boolean;
+    employeesVerified: boolean;
+  };
+  published: boolean;
+}
+
+export type StepDataMap = {
+  CompanyProfile: CompanyProfileData;
+  SalaryStructure: SalaryStructureData;
+  BenefitPolicy: BenefitPolicyData;
+  EmployeeImport: EmployeeImportData;
+  ReviewPublish: ReviewPublishData;
+};
+
+// ─── Defaults ────────────────────────────────────────────────────────────────
+
+export const DEFAULT_SALARY_COMPONENTS: SalaryComponent[] = [
+  { key: "basic", label: "Basic Pay", percent: 40, inclusion: true, optional: false },
+  { key: "rba", label: "Role-Based Allowance (RBA)", percent: 14, inclusion: true, optional: false },
+  { key: "ca", label: "Conveyance Allowance (CA)", percent: 20, inclusion: false, optional: false },
+  { key: "hra", label: "House Rent Allowance (HRA)", percent: 20, inclusion: false, optional: false },
+  { key: "bonus", label: "Statutory Bonus", percent: 6, inclusion: true, optional: false },
+  { key: "nps", label: "Employer NPS", percent: 0, inclusion: false, optional: true },
+];
+
+const makeBenefitRows = (multiplier: number): BenefitCategoryRow[] => [
+  { id: "food", name: "Food Allowance", enabled: true, monthlyLimit: Math.round(2500 * multiplier), billRequired: false, carryForward: false },
+  { id: "children_education", name: "Children's Education Allowance", enabled: true, monthlyLimit: Math.round(2000 * multiplier), billRequired: true, carryForward: true },
+  { id: "hostel", name: "Hostel Expenditure Allowance", enabled: false, monthlyLimit: Math.round(1500 * multiplier), billRequired: true, carryForward: true },
+  { id: "books", name: "Books and Periodicals", enabled: true, monthlyLimit: Math.round(1000 * multiplier), billRequired: true, carryForward: false },
+  { id: "professional", name: "Professional Development Allowance", enabled: multiplier > 1, monthlyLimit: Math.round(3000 * multiplier), billRequired: true, carryForward: false },
+  { id: "phone_internet", name: "Phone / Internet Allowance", enabled: true, monthlyLimit: Math.round(1500 * multiplier), billRequired: true, carryForward: true },
+  { id: "health_fitness", name: "Health and Fitness Allowance", enabled: true, monthlyLimit: Math.round(2000 * multiplier), billRequired: true, carryForward: false },
+  { id: "uniform", name: "Uniform Allowance", enabled: false, monthlyLimit: Math.round(1000 * multiplier), billRequired: true, carryForward: false },
+  { id: "gift", name: "Gift Allowance", enabled: false, monthlyLimit: Math.round(500 * multiplier), billRequired: false, carryForward: false },
+  { id: "business_travel", name: "Business Travel Allowance", enabled: true, monthlyLimit: Math.round(5000 * multiplier), billRequired: true, carryForward: true },
+  { id: "fuel", name: "Fuel Allowance", enabled: true, monthlyLimit: Math.round(3000 * multiplier), billRequired: true, carryForward: false },
+  { id: "vehicle_maintenance", name: "Vehicle Maintenance Allowance", enabled: false, monthlyLimit: Math.round(2000 * multiplier), billRequired: true, carryForward: true },
+  { id: "drivers_salary", name: "Driver's Salary", enabled: multiplier > 1.2, monthlyLimit: Math.round(4000 * multiplier), billRequired: true, carryForward: true },
+];
+
+const DEFAULT_STEP_DATA: StepDataMap = {
+  CompanyProfile: {
+    companyName: "",
+    industry: "",
+    companySize: "",
+    fiscalYearStart: "April",
+    payrollDay: 28,
+    hrAdminName: "",
+    hrAdminEmail: "",
+    hrAdminPhone: "",
+    hrAdminDesignation: "",
+  },
+  SalaryStructure: {
+    components: DEFAULT_SALARY_COMPONENTS,
+    sampleCtc: 800000,
+  },
+  BenefitPolicy: {
+    Associate: makeBenefitRows(0.8),
+    "Senior Associate": makeBenefitRows(1),
+    Manager: makeBenefitRows(1.3),
+    "Senior Manager": makeBenefitRows(1.6),
+    AVP: makeBenefitRows(2),
+    VP: makeBenefitRows(2.5),
+  },
+  EmployeeImport: {
+    employees: [],
+    fileName: "",
+    skipped: false,
+  },
+  ReviewPublish: {
+    checklist: {
+      companyVerified: false,
+      salaryVerified: false,
+      benefitsVerified: false,
+      employeesVerified: false,
+    },
+    published: false,
+  },
+};
+
+// ─── Validation ──────────────────────────────────────────────────────────────
+
+function isStepComplete(step: OnboardingStep, data: StepDataMap): boolean {
+  switch (step) {
+    case "CompanyProfile": {
+      const d = data.CompanyProfile;
+      return !!(d.companyName && d.industry && d.companySize && d.hrAdminName && d.hrAdminEmail);
+    }
+    case "SalaryStructure": {
+      const d = data.SalaryStructure;
+      const total = d.components.reduce((sum, c) => sum + c.percent, 0);
+      return total >= 95 && total <= 105;
+    }
+    case "BenefitPolicy": {
+      const d = data.BenefitPolicy;
+      return (
+        d.Associate.some((r) => r.enabled) &&
+        d["Senior Associate"].some((r) => r.enabled) &&
+        d.Manager.some((r) => r.enabled) &&
+        d["Senior Manager"].some((r) => r.enabled) &&
+        d.AVP.some((r) => r.enabled) &&
+        d.VP.some((r) => r.enabled)
+      );
+    }
+    case "EmployeeImport": {
+      const d = data.EmployeeImport;
+      return d.skipped || d.employees.filter((e) => e.valid).length > 0;
+    }
+    case "ReviewPublish": {
+      const c = data.ReviewPublish.checklist;
+      return c.companyVerified && c.salaryVerified && c.benefitsVerified && c.employeesVerified;
+    }
+  }
+}
+
+// ─── Hook ────────────────────────────────────────────────────────────────────
+
+export function useOnboardingState() {
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>("CompanyProfile");
+  const [stepData, setStepDataState] = useState<StepDataMap>({ ...DEFAULT_STEP_DATA });
+
+  const currentIndex = STEPS.indexOf(currentStep);
+
+  const setStepData = useCallback(
+    <S extends OnboardingStep>(step: S, partial: Partial<StepDataMap[S]>) => {
+      setStepDataState((prev) => ({
+        ...prev,
+        [step]: { ...prev[step], ...partial },
+      }));
+    },
+    []
+  );
+
+  const isComplete = useCallback(
+    (step: OnboardingStep) => isStepComplete(step, stepData),
+    [stepData]
+  );
+
+  const canProceed = useMemo(() => isStepComplete(currentStep, stepData), [currentStep, stepData]);
+
+  const nextStep = useCallback(() => {
+    const idx = STEPS.indexOf(currentStep);
+    if (idx < STEPS.length - 1) setCurrentStep(STEPS[idx + 1]);
+  }, [currentStep]);
+
+  const prevStep = useCallback(() => {
+    const idx = STEPS.indexOf(currentStep);
+    if (idx > 0) setCurrentStep(STEPS[idx - 1]);
+  }, [currentStep]);
+
+  const goToStep = useCallback((step: OnboardingStep) => {
+    setCurrentStep(step);
+  }, []);
+
+  return {
+    currentStep,
+    currentIndex,
+    stepData,
+    setStepData,
+    isComplete,
+    canProceed,
+    nextStep,
+    prevStep,
+    goToStep,
+  };
+}

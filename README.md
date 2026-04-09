@@ -1,73 +1,57 @@
-# React + TypeScript + Vite
+# Partner Portal — Monorepo
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Enterprise HR Benefits Portal built as a TurboRepo monorepo with shared packages.
 
-Currently, two official plugins are available:
+## Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+├── apps/
+│   └── partner-portal/          # Vite + React SPA
+├── packages/
+│   ├── config/                  # Shared TypeScript & ESLint configs
+│   ├── shared/                  # Types, API client, utils, hooks, contexts
+│   └── ui/                      # 7 reusable UI components
+├── turbo.json                   # TurboRepo pipeline
+├── pnpm-workspace.yaml          # pnpm workspaces
+└── package.json                 # Root scripts
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Getting Started
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev        # Start dev server
+pnpm build      # Build all packages + app
+pnpm lint       # Lint everything
+pnpm test       # Run tests
 ```
+
+## Packages
+
+### @partner-portal/shared
+Types, API client (Supabase), helper functions, hooks (`useIsMobile`, `useFiscalYear`), and contexts (`UserProfileContext`, `SearchContext`).
+
+### @partner-portal/ui
+Reusable UI components: `StatCard`, `DataTable`, `FilterBar`, `EmptyState`, `ExportButton`, `StepIndicator`, `ProgressRing`.
+
+### @partner-portal/config
+Shared `tsconfig` and ESLint configurations extended by all packages and apps.
+
+## Import Patterns
+
+```typescript
+import { type Employee, BENEFIT_PLANS } from "@partner-portal/shared";
+import * as api from "@partner-portal/shared/api";
+import { formatINR } from "@partner-portal/shared/helpers";
+import { useIsMobile } from "@partner-portal/shared/hooks/useIsMobile";
+import { useUserProfile } from "@partner-portal/shared/contexts/UserProfileContext";
+import { StatCard, DataTable } from "@partner-portal/ui";
+```
+
+## Tech Stack
+- **Runtime**: React 19, TypeScript 5.9
+- **Build**: Vite 8, TurboRepo
+- **Styling**: Tailwind CSS 4, CSS variables
+- **Backend**: Supabase Edge Functions
+- **Package Manager**: pnpm 9
+- **Deployment**: Vercel
