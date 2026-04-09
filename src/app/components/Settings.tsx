@@ -76,7 +76,8 @@ export function Settings() {
     notifyOnNewEmployee: true,
     notifyOnPolicyChange: false,
     // Workflow
-    autoApproveThreshold: 5000,
+    autoApproveEnabled: true,
+    autoApproveThreshold: 2000,
     escalationHours: 48,
     // Security
     twoFactorEnabled: false,
@@ -209,7 +210,7 @@ export function Settings() {
     setSettings(prev => ({ ...prev, [key]: value }));
     // Determine which tab this setting belongs to
     const notifKeys = ["emailEnabled", "slackEnabled", "digestFrequency", "notifyOnClaim", "notifyOnApproval", "notifyOnNewEmployee", "notifyOnPolicyChange"];
-    const workflowKeys = ["autoApproveThreshold", "escalationHours"];
+    const workflowKeys = ["autoApproveEnabled", "autoApproveThreshold", "escalationHours"];
     const securityKeys = ["twoFactorEnabled", "sessionTimeout"];
     const dataKeys = ["exportFormat", "dataRetention"];
     if (notifKeys.includes(key)) markDirty("notifications");
@@ -474,14 +475,20 @@ export function Settings() {
               Workflow Settings
             </h3>
 
-            {renderField("Auto-Approve Threshold (INR)",
-              <div>
-                <input type="number" style={inputStyle} value={settings.autoApproveThreshold}
-                  onChange={e => updateSetting("autoApproveThreshold", Number(e.target.value))} />
-                <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
-                  Claims below this amount will be auto-approved. Set to 0 to disable.
-                </p>
-              </div>
+            {renderToggleRow("Auto-Approve Claims", "Automatically approve claims below a specified bill amount",
+              settings.autoApproveEnabled, () => updateSetting("autoApproveEnabled", !settings.autoApproveEnabled)
+            )}
+
+            {settings.autoApproveEnabled && (
+              renderField("Auto-Approve for Bill Amount Less Than (INR)",
+                <div>
+                  <input type="number" style={inputStyle} value={settings.autoApproveThreshold}
+                    onChange={e => updateSetting("autoApproveThreshold", Number(e.target.value))} />
+                  <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                    Claims below this amount will be auto-approved.
+                  </p>
+                </div>
+              )
             )}
 
             {/* Divider */}

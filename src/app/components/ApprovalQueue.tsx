@@ -34,7 +34,7 @@ const inputStyle: CSSProperties = {
 
 /** Claims below this amount are auto-approved by the system.
  *  Anything ≥ this requires manual review in the Pending Approval tab. */
-const AUTO_APPROVE_THRESHOLD = 70000;
+const AUTO_APPROVE_THRESHOLD = 2000;
 
 /** Date after which any still-unapproved claim is auto-approved. */
 const AUTO_APPROVE_CUTOFF = "2026-03-31";
