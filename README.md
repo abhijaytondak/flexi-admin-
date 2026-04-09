@@ -6,30 +6,29 @@ Enterprise HR Benefits Portal built as a TurboRepo monorepo with shared packages
 
 ```
 ├── apps/
-│   └── partner-portal/          # Vite + React SPA
+│   └── partner-portal/          # Next.js 15 App Router
 ├── packages/
 │   ├── config/                  # Shared TypeScript & ESLint configs
-│   ├── shared/                  # Types, API client, utils, hooks, contexts
+│   ├── shared/                  # Types, API client (axios), utils, hooks, contexts
 │   └── ui/                      # 7 reusable UI components
 ├── turbo.json                   # TurboRepo pipeline
-├── pnpm-workspace.yaml          # pnpm workspaces
-└── package.json                 # Root scripts
+└── package.json                 # Root scripts (Yarn workspaces)
 ```
 
 ## Getting Started
 
 ```bash
-pnpm install
-pnpm dev        # Start dev server
-pnpm build      # Build all packages + app
-pnpm lint       # Lint everything
-pnpm test       # Run tests
+yarn install
+yarn dev        # Start dev server
+yarn build      # Build all packages + app
+yarn lint       # Lint everything
+yarn test       # Run tests
 ```
 
 ## Packages
 
 ### @partner-portal/shared
-Types, API client (Supabase), helper functions, hooks (`useIsMobile`, `useFiscalYear`), and contexts (`UserProfileContext`, `SearchContext`).
+Types, API client (axios + Supabase), helper functions, hooks (`useIsMobile`, `useFiscalYear`), and contexts (`UserProfileContext`, `SearchContext`).
 
 ### @partner-portal/ui
 Reusable UI components: `StatCard`, `DataTable`, `FilterBar`, `EmptyState`, `ExportButton`, `StepIndicator`, `ProgressRing`.
@@ -49,9 +48,11 @@ import { StatCard, DataTable } from "@partner-portal/ui";
 ```
 
 ## Tech Stack
+- **Framework**: Next.js 15 (App Router)
 - **Runtime**: React 19, TypeScript 5.9
-- **Build**: Vite 8, TurboRepo
+- **Build**: TurboRepo
+- **HTTP Client**: Axios
 - **Styling**: Tailwind CSS 4, CSS variables
 - **Backend**: Supabase Edge Functions
-- **Package Manager**: pnpm 9
+- **Package Manager**: Yarn (workspaces)
 - **Deployment**: Vercel

@@ -1,16 +1,16 @@
 // Types
-export * from "./types/index.ts";
+export * from "./types";
 
 // Utils
-export * as api from "./utils/api.ts";
-export { deriveBenefitPlan, deriveBracketLabel, formatINR, parseINR, getTimeGreeting, getInitials, downloadFile, cn } from "./utils/helpers.ts";
-export { DEMO_EMPLOYEES, DEMO_CLAIMS, DEMO_BRACKETS, DEMO_DASHBOARD } from "./utils/demoData.ts";
+export * as api from "./utils/api";
+export { deriveBenefitPlan, deriveBracketLabel, formatINR, parseINR, getTimeGreeting, getInitials, downloadFile, cn } from "./utils/helpers";
+export { DEMO_EMPLOYEES, DEMO_CLAIMS, DEMO_BRACKETS, DEMO_DASHBOARD } from "./utils/demoData";
 
 // Hooks
-export { useIsMobile } from "./hooks/useIsMobile.ts";
-export { useFiscalYear } from "./hooks/useFiscalYear.ts";
-export type { FiscalCycle, FiscalYearInfo } from "./hooks/useFiscalYear.ts";
+export { useIsMobile } from "./hooks/useIsMobile";
+export { useFiscalYear } from "./hooks/useFiscalYear";
+export type { FiscalCycle, FiscalYearInfo } from "./hooks/useFiscalYear";
 
 // Contexts
-export { UserProfileProvider, useUserProfile } from "./contexts/UserProfileContext.tsx";
-export { SearchProvider, useSearch } from "./contexts/SearchContext.tsx";
+export { UserProfileProvider, useUserProfile } from "./contexts/UserProfileContext";
+export { SearchProvider, useSearch } from "./contexts/SearchContext";
