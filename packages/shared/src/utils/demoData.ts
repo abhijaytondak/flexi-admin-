@@ -4,7 +4,7 @@
  * Used as fallback when API returns empty or setupRequired.
  */
 
-import type { Employee, Claim, SalaryBand } from "../types";
+import type { Employee, Claim, SalaryBand, Cycle, Dispute, RiskLevel, BillStatus, AutoApproveRule } from "../types";
 import { FLEXI_BENEFIT_CATEGORIES } from "../types";
 
 // ─── Employees ───────────────────────────────────────────────────────────────
@@ -188,6 +188,330 @@ export const DEMO_BRACKETS: SalaryBand[] = [
       drivers_salary: { name: "Driver's Salary", monthlyLimit: "12,000", billRequired: true, carryForward: true },
       vehicle_maintenance: { name: "Vehicle Maintenance", monthlyLimit: "8,000", billRequired: true, carryForward: true },
     }),
+  },
+];
+
+// ─── Cycles (PRD v0) ─────────────────────────────────────────────────────────
+
+export const DEMO_CYCLES: Cycle[] = [
+  {
+    id: "cyc-2026-02",
+    month: "February",
+    year: 2026,
+    label: "February 2026",
+    submissionCutoff: "2026-02-25",
+    payrollCutoff: "2026-02-28",
+    status: "closed",
+  },
+  {
+    id: "cyc-2026-03",
+    month: "March",
+    year: 2026,
+    label: "March 2026",
+    submissionCutoff: "2026-03-25",
+    payrollCutoff: "2026-03-28",
+    status: "closed",
+  },
+  {
+    id: "cyc-2026-04",
+    month: "April",
+    year: 2026,
+    label: "April 2026",
+    submissionCutoff: "2026-04-25",
+    payrollCutoff: "2026-04-28",
+    status: "active",
+  },
+];
+
+export const CURRENT_CYCLE_ID = "cyc-2026-04";
+
+// ─── Claim augmentation (PRD v0) ─────────────────────────────────────────────
+//
+// Mutates DEMO_CLAIMS in-place with additive fields:
+//  - cycleId (~75% on active)
+//  - riskLevel distribution (~80% normal / 15% medium / 5% high)
+//  - flaggedByAI + flagReason on high + some medium
+//  - billStatus, approvalSource, autoApproveRule on auto-approved,
+//    multiMonthAllocation on 2-3 claims
+// ---------------------------------------------------------------------------
+
+const RISK_DISTRIBUTION: RiskLevel[] = [
+  // 80% normal, 15% medium, 5% high over 20 slots
+  "normal","normal","normal","normal","normal","normal","normal","normal","normal","normal",
+  "normal","normal","normal","normal","normal","normal",
+  "medium","medium","medium",
+  "high",
+];
+
+const BILL_STATUSES: BillStatus[] = ["validated", "uploaded", "pending", "mismatch", "not_required"];
+
+const FLAG_REASONS = [
+  "Merchant not in pre-approved list",
+  "Amount exceeds category median by 3.2x",
+  "Possible duplicate of last cycle submission",
+  "Receipt text mismatch with declared merchant",
+  "Pattern deviates from employee's baseline",
+];
+
+// Apply augmentation deterministically by index so every demo run is consistent.
+DEMO_CLAIMS.forEach((c, i) => {
+  // ~75% of claims belong to the active cycle; the rest go to the most recent closed cycle.
+  c.cycleId = i % 4 === 0 ? "cyc-2026-03" : CURRENT_CYCLE_ID;
+
+  const risk = RISK_DISTRIBUTION[i % RISK_DISTRIBUTION.length];
+  c.riskLevel = risk;
+
+  // AI flag: all highs are flagged; about 1/3 of mediums are flagged
+  if (risk === "high" || (risk === "medium" && i % 3 === 0)) {
+    c.flaggedByAI = true;
+    c.flagReason = FLAG_REASONS[i % FLAG_REASONS.length];
+  } else {
+    c.flaggedByAI = false;
+  }
+
+  // Bill status by category: food rarely needs bill, others do
+  if (c.category === "Food") {
+    c.billStatus = i % 2 === 0 ? "not_required" : "validated";
+  } else {
+    c.billStatus = BILL_STATUSES[i % BILL_STATUSES.length];
+  }
+
+  if (c.status === "approved") {
+    c.approvalSource = i % 3 === 0 ? "auto" : "manual";
+    // If auto, attach a rule — exercise all 3 types across the dataset
+    if (c.approvalSource === "auto") {
+      c.status = "auto_approved";
+      const ruleKind = i % 3;
+      if (ruleKind === 0) {
+        c.autoApproveRule = { type: "category", category: "food" };
+      } else if (ruleKind === 1) {
+        c.autoApproveRule = { type: "threshold", amountLessThan: 2500 };
+      } else {
+        c.autoApproveRule = { type: "employee", employeeId: c.employeeId || "EMP-001" };
+      }
+    }
+  }
+});
+
+// Ensure we exercise each AutoApproveRule discriminated-union variant at least once:
+const ruleSeeds: { id: string; rule: AutoApproveRule }[] = [
+  { id: "CLM-1009", rule: { type: "category", category: "fuel" } },
+  { id: "CLM-1010", rule: { type: "threshold", amountLessThan: 2500 } },
+  { id: "CLM-1011", rule: { type: "employee", employeeId: "EMP-011" } },
+];
+ruleSeeds.forEach(({ id, rule }) => {
+  const claim = DEMO_CLAIMS.find((c) => c.id === id);
+  if (claim) {
+    claim.status = "auto_approved";
+    claim.approvalSource = "auto";
+    claim.autoApproveRule = rule;
+    claim.cycleId = CURRENT_CYCLE_ID;
+    claim.flaggedByAI = false;
+    claim.riskLevel = "normal";
+  }
+});
+
+// Seed multi-month allocation on 2-3 claims
+const allocSeeds = [
+  {
+    id: "CLM-1022",
+    originalTransactionId: "UPI-ORIG-55647382",
+    originalDate: "2026-03-15",
+    originalMerchant: "ISB Hyderabad",
+    originalAmount: 240000,
+    allocationAmount: 120000,
+    index: 2,
+    total: 2,
+  },
+  {
+    id: "CLM-1021",
+    originalTransactionId: "UPI-ORIG-91827364",
+    originalDate: "2026-03-22",
+    originalMerchant: "Emirates",
+    originalAmount: 190800,
+    allocationAmount: 95400,
+    index: 1,
+    total: 2,
+  },
+  {
+    id: "CLM-1023",
+    originalTransactionId: "UPI-ORIG-73625481",
+    originalDate: "2026-04-02",
+    originalMerchant: "Direct Payment",
+    originalAmount: 78500,
+    allocationAmount: 78500,
+    index: 1,
+    total: 1,
+  },
+];
+allocSeeds.forEach((s) => {
+  const claim = DEMO_CLAIMS.find((c) => c.id === s.id);
+  if (claim) {
+    claim.multiMonthAllocation = {
+      index: s.index,
+      total: s.total,
+      originalTransactionId: s.originalTransactionId,
+      originalDate: s.originalDate,
+      originalMerchant: s.originalMerchant,
+      originalAmount: s.originalAmount,
+      allocationAmount: s.allocationAmount,
+    };
+    claim.cycleId = CURRENT_CYCLE_ID;
+  }
+});
+
+// Rejection reasons on already-rejected claims
+const rejSeeds: { id: string; reason: Claim["rejectionReason"]; note?: string }[] = [
+  { id: "CLM-1014", reason: "not_a_business_expense" },
+  { id: "CLM-1015", reason: "policy_violation" },
+];
+rejSeeds.forEach(({ id, reason, note }) => {
+  const claim = DEMO_CLAIMS.find((c) => c.id === id);
+  if (claim) {
+    claim.rejectionReason = reason;
+    if (note) claim.rejectionNote = note;
+  }
+});
+
+// ─── Disputes (PRD v0) ───────────────────────────────────────────────────────
+
+export const DEMO_DISPUTES: Dispute[] = [
+  {
+    id: "DSP-2001",
+    employeeId: "EMP-001",
+    employeeName: "Raj Patel",
+    initials: "RP",
+    avatarColor: COLORS[0],
+    claimId: "CLM-1001",
+    claimCategory: "Fuel",
+    originalTransaction: { date: "2026-04-12", merchant: "Indian Oil Corp", amount: 3200 },
+    disputeType: "wrong_category",
+    status: "raised",
+    raisedAt: "2026-04-14T09:12:00Z",
+  },
+  {
+    id: "DSP-2002",
+    employeeId: "EMP-004",
+    employeeName: "Sneha Gupta",
+    initials: "SG",
+    avatarColor: COLORS[3],
+    claimId: "CLM-1004",
+    claimCategory: "Health",
+    originalTransaction: { date: "2026-04-10", merchant: "Cult.fit", amount: 4500 },
+    disputeType: "wrong_rejection",
+    status: "under_review",
+    raisedAt: "2026-04-13T14:30:00Z",
+  },
+  {
+    id: "DSP-2003",
+    employeeId: "EMP-007",
+    employeeName: "Karthik Iyer",
+    initials: "KI",
+    avatarColor: COLORS[6],
+    claimId: "CLM-1008",
+    claimCategory: "Food",
+    originalTransaction: { date: "2026-04-09", merchant: "Zomato", amount: 2000 },
+    disputeType: "missed_transaction",
+    status: "under_review",
+    raisedAt: "2026-04-12T11:05:00Z",
+  },
+  {
+    id: "DSP-2004",
+    employeeId: "EMP-009",
+    employeeName: "Rohit Dalal",
+    initials: "RD",
+    avatarColor: COLORS[8],
+    claimId: "CLM-1010",
+    claimCategory: "Food",
+    originalTransaction: { date: "2026-03-18", merchant: "Sodexo", amount: 2200 },
+    disputeType: "wrong_category",
+    status: "resolved",
+    resolutionDetails: {
+      action: "Category updated from Food to Business Meals",
+      by: "Ops (Priya N.)",
+      at: "2026-03-22T10:00:00Z",
+    },
+    raisedAt: "2026-03-20T16:40:00Z",
+  },
+  {
+    id: "DSP-2005",
+    employeeId: "EMP-013",
+    employeeName: "Sanjay Mehta",
+    initials: "SM",
+    avatarColor: COLORS[12],
+    claimId: "CLM-1014",
+    claimCategory: "Travel",
+    originalTransaction: { date: "2026-03-10", merchant: "MakeMyTrip", amount: 18500 },
+    disputeType: "wrong_rejection",
+    status: "rejected",
+    resolutionDetails: {
+      action: "Dispute reviewed; original rejection upheld",
+      by: "Ops (Arvind S.)",
+      at: "2026-03-14T13:20:00Z",
+    },
+    raisedAt: "2026-03-12T09:00:00Z",
+  },
+  {
+    id: "DSP-2006",
+    employeeId: "EMP-015",
+    employeeName: "Rahul Khanna",
+    initials: "RK",
+    avatarColor: COLORS[14],
+    claimId: "CLM-1020",
+    claimCategory: "Travel",
+    originalTransaction: { date: "2026-04-08", merchant: "Air India", amount: 15200 },
+    disputeType: "other",
+    status: "raised",
+    raisedAt: "2026-04-15T08:20:00Z",
+  },
+  {
+    id: "DSP-2007",
+    employeeId: "EMP-010",
+    employeeName: "Deepika Nair",
+    initials: "DN",
+    avatarColor: COLORS[9],
+    claimId: "CLM-1007",
+    claimCategory: "Education",
+    originalTransaction: { date: "2026-04-05", merchant: "Udemy", amount: 8500 },
+    disputeType: "missed_transaction",
+    status: "resolved",
+    resolutionDetails: {
+      action: "Missed transaction added to cycle",
+      by: "Ops (Neha V.)",
+      at: "2026-04-11T17:15:00Z",
+    },
+    raisedAt: "2026-04-09T12:00:00Z",
+  },
+  {
+    id: "DSP-2008",
+    employeeId: "EMP-020",
+    employeeName: "Divya Rao",
+    initials: "DR",
+    avatarColor: COLORS[4],
+    claimId: "CLM-1016",
+    claimCategory: "Fuel",
+    originalTransaction: { date: "2026-04-14", merchant: "BPCL", amount: 4100 },
+    disputeType: "wrong_category",
+    status: "under_review",
+    raisedAt: "2026-04-16T10:45:00Z",
+  },
+  {
+    id: "DSP-2009",
+    employeeId: "EMP-019",
+    employeeName: "Aditya Bhatt",
+    initials: "AB",
+    avatarColor: COLORS[3],
+    claimId: "CLM-1015",
+    claimCategory: "Other",
+    originalTransaction: { date: "2026-03-24", merchant: "Amazon India", amount: 5000 },
+    disputeType: "other",
+    status: "rejected",
+    resolutionDetails: {
+      action: "Insufficient documentation — original decision maintained",
+      by: "Ops (Arvind S.)",
+      at: "2026-03-28T09:10:00Z",
+    },
+    raisedAt: "2026-03-26T15:30:00Z",
   },
 ];
 

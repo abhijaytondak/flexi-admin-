@@ -27,7 +27,86 @@ export interface Employee {
 
 // ─── Claim ────────────────────────────────────────────────────────────────────
 
-export type ClaimStatus = "claimed" | "invoice_pending" | "submitted" | "pending" | "approved" | "rejected";
+export type ClaimStatus =
+  | "claimed"
+  | "invoice_pending"
+  | "submitted"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "eligible"
+  | "auto_approved"
+  | "flagged_for_later";
+
+// ─── PRD v0 additions: cycles, risk, allocation, auto-approve, disputes ───────
+
+export type CycleStatus = "active" | "closed";
+
+export interface Cycle {
+  id: string;
+  month: string;          // e.g. "April"
+  year: number;           // e.g. 2026
+  label: string;          // e.g. "April 2026"
+  submissionCutoff: string; // ISO date — last day employees can submit claims
+  payrollCutoff: string;    // ISO date — HR payroll export deadline
+  status: CycleStatus;
+}
+
+export type RiskLevel = "normal" | "medium" | "high";
+
+export type BillStatus = "uploaded" | "validated" | "pending" | "mismatch" | "not_required";
+
+export interface MultiMonthAllocation {
+  index: number;                    // allocation X of Y (1-based)
+  total: number;                    // total allocations
+  originalTransactionId: string;
+  originalDate: string;             // ISO
+  originalMerchant: string;
+  originalAmount: number;           // full txn amount
+  allocationAmount: number;         // the slice attributed to this cycle
+}
+
+export type AutoApproveRule =
+  | { type: "category"; category: AllowanceCategory }
+  | { type: "threshold"; amountLessThan: number }
+  | { type: "employee"; employeeId: string };
+
+export type RejectionReason =
+  | "not_a_business_expense"
+  | "duplicate_claim"
+  | "policy_violation"
+  | "other";
+
+export type DisputeType =
+  | "wrong_category"
+  | "wrong_rejection"
+  | "missed_transaction"
+  | "other";
+
+export type DisputeStatus = "raised" | "under_review" | "resolved" | "rejected";
+
+export interface Dispute {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  initials: string;
+  avatarColor: string;
+  claimId: string;
+  claimCategory: string;
+  originalTransaction: {
+    date: string;
+    merchant: string;
+    amount: number;
+  };
+  disputeType: DisputeType;
+  status: DisputeStatus;
+  resolutionDetails?: {
+    action: string;
+    by: string;
+    at: string;
+  };
+  raisedAt: string;
+}
 
 export interface Claim {
   id: string;
@@ -51,6 +130,17 @@ export interface Claim {
   transactionId?: string;
   salaryBand?: string;
   approvalTag?: "auto" | "manual" | "escalated";
+  // ─── PRD v0 additive fields ──────────────────────────────────────────────
+  cycleId?: string;
+  riskLevel?: RiskLevel;
+  flaggedByAI?: boolean;
+  flagReason?: string;
+  billStatus?: BillStatus;
+  multiMonthAllocation?: MultiMonthAllocation;
+  autoApproveRule?: AutoApproveRule;
+  approvalSource?: "auto" | "manual";
+  rejectionReason?: RejectionReason;
+  rejectionNote?: string;
 }
 
 // ─── Policy ───────────────────────────────────────────────────────────────────

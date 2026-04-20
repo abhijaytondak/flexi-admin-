@@ -9,7 +9,6 @@ import {
   ClipboardCheck,
   Download,
   Users,
-  Bell,
   ChevronRight,
   HelpCircle,
   Home,
@@ -21,8 +20,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { UserProfileProvider, useUserProfile } from "@partner-portal/shared/contexts/UserProfileContext";
-import { NotificationDrawer } from "./NotificationDrawer";
 import { useIsMobile } from "@partner-portal/shared/hooks/useIsMobile";
+
+// Auth-only routes: the app sidebar is bypassed via segment layouts,
+// but we also guard here in case a child renders Layout transitively.
+const AUTH_ROUTES = new Set(["/login", "/forgot-password"]);
 
 // ─── Nav Items ──────────────────────────────────────────────────────────────
 
@@ -31,7 +33,6 @@ const MAIN_NAV_ITEMS = [
     path: "/",
     label: "Dashboard",
     icon: LayoutDashboard,
-    badge: "9",
     iconBg: "var(--icon-dashboard-bg)",
     iconFg: "var(--icon-dashboard-fg)",
   },
@@ -67,6 +68,13 @@ const MAIN_NAV_ITEMS = [
     path: "/settings",
     label: "Settings",
     icon: Settings,
+    iconBg: "var(--icon-settings-bg)",
+    iconFg: "var(--icon-settings-fg)",
+  },
+  {
+    path: "/help",
+    label: "Help Center",
+    icon: HelpCircle,
     iconBg: "var(--icon-help-bg)",
     iconFg: "var(--icon-help-fg)",
   },
@@ -80,8 +88,6 @@ function getPageTitle(pathname: string): string {
   const item = NAV_ITEMS.find((n) => n.path === pathname);
   if (item) return item.label;
   if (pathname === "/onboarding") return "Onboarding";
-  if (pathname === "/settings") return "Settings";
-  if (pathname === "/help") return "Help Center";
   return "SalarySe";
 }
 
@@ -113,14 +119,12 @@ function SidebarNavItem({
   path,
   label,
   icon: Icon,
-  badge,
   iconBg,
   iconFg,
 }: {
   path: string;
   label: string;
   icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
-  badge?: string;
   iconBg: string;
   iconFg: string;
 }) {
@@ -173,29 +177,52 @@ function SidebarNavItem({
 
       {/* Label */}
       <span className="flex-1">{label}</span>
-
-      {/* Optional count badge */}
-      {badge && (
-        <span
-          className="flex items-center justify-center"
-          style={{
-            minWidth: 20,
-            height: 20,
-            padding: "0 6px",
-            borderRadius: "var(--rounded-full)",
-            backgroundColor: isActive
-              ? "var(--brand-accent)"
-              : "var(--color-border)",
-            color: isActive ? "#FFFFFF" : "var(--sidebar-text-muted)",
-            fontSize: 11,
-            fontWeight: 600,
-            lineHeight: 1,
-          }}
-        >
-          {badge}
-        </span>
-      )}
     </Link>
+  );
+}
+
+// ─── Sidebar Logout Row ─────────────────────────────────────────────────────
+
+function SidebarLogoutRow({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-3 transition-colors duration-150"
+      style={{
+        width: "100%",
+        padding: "8px 12px",
+        borderRadius: 8,
+        fontSize: "var(--text-sm)",
+        fontWeight: 400,
+        color: "var(--sidebar-text-muted)",
+        backgroundColor: "transparent",
+        border: "none",
+        cursor: "pointer",
+        fontFamily: "'IBM Plex Sans', sans-serif",
+        textAlign: "left",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "transparent";
+      }}
+    >
+      <div
+        className="flex items-center justify-center shrink-0"
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 6,
+          // muted red tint — deliberately restrained
+          backgroundColor: "rgba(231, 76, 60, 0.08)",
+        }}
+      >
+        <LogOut size={14} style={{ color: "#C0392B" }} />
+      </div>
+      <span className="flex-1">Logout</span>
+    </button>
   );
 }
 
@@ -208,26 +235,27 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   // Close mobile sidebar on route change
   useEffect(() => {
     setSidebarOpen(false);
-    setProfileMenuOpen(false);
   }, [pathname]);
 
   const handleLogout = useCallback(() => {
-    try { localStorage.removeItem("userProfile"); } catch { /* noop */ }
-    setProfileMenuOpen(false);
+    try {
+      localStorage.removeItem("userProfile");
+    } catch {
+      /* noop */
+    }
     toast.success("Logged out");
-    router.push("/");
+    router.push("/login");
   }, [router]);
 
-  const handleUnreadCountChange = useCallback((count: number) => {
-    setUnreadCount(count);
-  }, []);
+  // If this is an auth route, short-circuit — the segment layout renders the
+  // full-viewport AuthLayout without the sidebar chrome.
+  if (AUTH_ROUTES.has(pathname)) {
+    return <>{children}</>;
+  }
 
   const pageTitle = getPageTitle(pathname);
 
@@ -314,30 +342,25 @@ function LayoutInner({ children }: { children: ReactNode }) {
           {MAIN_NAV_ITEMS.map((item) => (
             <SidebarNavItem key={item.path} {...item} />
           ))}
-
-          <div style={{ height: 1, backgroundColor: "var(--sidebar-divider)", margin: "12px 4px 8px" }} />
-
-          <SidebarNavItem
-            path="/help"
-            label="Help center"
-            icon={HelpCircle}
-            iconBg="var(--icon-help-bg)"
-            iconFg="var(--icon-help-fg)"
-          />
         </nav>
 
         {/* ── Profile Footer ──────────────────────────────────────────── */}
-        <div style={{ position: "relative", borderTop: "1px solid var(--sidebar-divider)" }}>
-          <button
-            onClick={() => setProfileMenuOpen((v) => !v)}
-            className="flex items-center gap-3 transition-colors duration-150"
+        <div
+          style={{
+            borderTop: "1px solid var(--sidebar-divider)",
+            padding: "12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+          }}
+        >
+          {/* Profile row (display-only; logout lives below as its own row) */}
+          <div
+            className="flex items-center gap-3"
             style={{
-              padding: "12px 16px", background: "none", border: "none",
-              cursor: "pointer", textAlign: "left", width: "100%",
-              fontFamily: "'IBM Plex Sans', sans-serif",
+              padding: "8px 12px",
+              borderRadius: 8,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
           >
             <div
               className="flex items-center justify-center shrink-0"
@@ -354,36 +377,12 @@ function LayoutInner({ children }: { children: ReactNode }) {
                 {profile.name}
               </div>
               <div className="truncate" style={{ fontSize: "var(--text-xs)", color: "var(--sidebar-text-muted)", lineHeight: 1.3 }}>
-                Profile
+                {profile.email}
               </div>
             </div>
-          </button>
+          </div>
 
-          {profileMenuOpen && (
-            <div style={{
-              position: "absolute", bottom: "calc(100% + 4px)", left: 12, right: 12,
-              backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)",
-              borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.15)", padding: 8, zIndex: 50,
-            }}>
-              <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--color-border)", marginBottom: 6 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-foreground)" }}>{profile.name}</div>
-                <div style={{ fontSize: 11, color: "var(--color-muted-foreground)" }}>{profile.email}</div>
-              </div>
-              <button
-                onClick={handleLogout}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8, width: "100%",
-                  padding: "8px 10px", background: "none", border: "none",
-                  borderRadius: 6, cursor: "pointer", textAlign: "left",
-                  fontSize: 13, color: "var(--brand-red)", fontFamily: "'IBM Plex Sans', sans-serif",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-background)")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-              >
-                <LogOut size={14} /> Logout
-              </button>
-            </div>
-          )}
+          <SidebarLogoutRow onClick={handleLogout} />
         </div>
       </aside>
 
@@ -421,35 +420,8 @@ function LayoutInner({ children }: { children: ReactNode }) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setDrawerOpen(true)}
-              aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
-              className="flex items-center justify-center transition-colors duration-150"
-              style={{
-                width: 34, height: 34, borderRadius: 8,
-                border: "1px solid var(--color-border)", background: "none",
-                cursor: "pointer", color: "var(--sidebar-text-muted)", position: "relative",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-            >
-              <Bell size={16} />
-              {unreadCount > 0 && (
-                <span
-                  className="flex items-center justify-center"
-                  style={{
-                    position: "absolute", top: 3, right: 3, minWidth: 16, height: 16,
-                    padding: "0 4px", borderRadius: "var(--rounded-full)",
-                    backgroundColor: "var(--brand-accent)", color: "#fff",
-                    fontSize: 10, fontWeight: 600, lineHeight: 1,
-                  }}
-                >
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
-            </button>
-          </div>
+          {/* Bell/notification button intentionally removed per PRD v0 */}
+          <div />
         </header>
 
         {/* ── Content Area ────────────────────────────────────────────── */}
@@ -467,13 +439,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
           </Suspense>
         </main>
       </div>
-
-      {/* Notification Drawer */}
-      <NotificationDrawer
-        isOpen={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onUnreadCountChange={handleUnreadCountChange}
-      />
     </div>
   );
 }

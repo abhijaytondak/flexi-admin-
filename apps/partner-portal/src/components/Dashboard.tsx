@@ -1,1112 +1,723 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import * as api from "@partner-portal/shared/api";
-import { useUserProfile } from "@partner-portal/shared/contexts/UserProfileContext";
-import { AVATAR_COLORS } from "@partner-portal/shared";
-import { DEMO_DASHBOARD, DEMO_EMPLOYEES } from "@partner-portal/shared/demo-data";
-import { useIsMobile } from "@partner-portal/shared/hooks/useIsMobile";
-import { getTimeGreeting, formatINR } from "@partner-portal/shared/helpers";
+import React, { useMemo, useState, type CSSProperties } from "react";
 import {
-  TrendingUp,
-  TrendingDown,
+  AlertTriangle,
+  CheckCircle2,
   Users,
-  IndianRupee,
-  ShieldCheck,
-  Clock,
-  AlertCircle,
-  Loader2,
-  RefreshCw,
-  Check,
-  X,
-  ChevronDown,
-  Pencil,
-  Upload,
-  MoreHorizontal,
-  ArrowUpRight,
-  ArrowDownRight,
-  FileText,
-  Briefcase,
+  Wallet,
+  TrendingUp,
+  CircleDot,
+  Inbox,
 } from "lucide-react";
 import {
-  PieChart,
-  Pie,
-  Cell,
   ResponsiveContainer,
-  Tooltip,
   AreaChart,
   Area,
   XAxis,
   YAxis,
   CartesianGrid,
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  Legend,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
+import {
+  DEMO_CLAIMS,
+  DEMO_CYCLES,
+  CURRENT_CYCLE_ID,
+  FLEXI_BENEFIT_CATEGORIES,
+  type Claim,
+  type Cycle,
+} from "@partner-portal/shared";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Design tokens — Microdose-inspired analytics dashboard
+   Dashboard — PRD §4.1
+   Visual tokens resolve via CSS custom properties declared in theme.css.
+   The component intentionally avoids gradients, stacked shadows, and color
+   pile-ons: hierarchy comes from type scale + whitespace.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const T = {
-  font: "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  bg: "#FAFAFA",
-  card: "#FFFFFF",
-  border: "#EBEBEB",
-  fg: "#1A1A1A",
-  muted: "#8C8C8C",
-  mutedLight: "#B3B3B3",
-  accent: "#E8683A",
-  green: "#27AE60",
-  greenBg: "#EAFAF1",
-  red: "#E74C3C",
-  redBg: "#FDEDEC",
-  amber: "#F39C12",
-  amberBg: "#FEF9E7",
-  blue: "#3498DB",
-  blueBg: "#EBF5FB",
-  purple: "#9B59B6",
-  radius: 12,
-  transition: "all 200ms ease",
-} as const;
+const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Static chart data — Benefit Utilization
-   ═══════════════════════════════════════════════════════════════════════════ */
+const INR = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+});
 
-/* Claims Overview — daily volume over past month */
-const CLAIMS_OVERVIEW_DATA = [
-  { date: "1", claims: 820 },
-  { date: "3", claims: 1200 },
-  { date: "5", claims: 950 },
-  { date: "7", claims: 1800 },
-  { date: "9", claims: 2100 },
-  { date: "11", claims: 1600 },
-  { date: "13", claims: 3200 },
-  { date: "15", claims: 4500 },
-  { date: "17", claims: 3800 },
-  { date: "19", claims: 5200 },
-  { date: "21", claims: 6800 },
-  { date: "23", claims: 7200 },
-  { date: "25", claims: 9400 },
-  { date: "27", claims: 11200 },
-  { date: "29", claims: 12800 },
-  { date: "31", claims: 14200 },
+type VolumeRange = "last_month" | "last_3_months" | "ytd";
+
+// Tight category palette — restrained. Accent first, neutrals next.
+const CATEGORY_COLORS = [
+  "#3D41FA",
+  "#27AE60",
+  "#F39C12",
+  "#3498DB",
+  "#9B59B6",
+  "#16A085",
+  "#E67E22",
+  "#1A2B3C",
+  "#8E44AD",
+  "#E74C3C",
+  "#2980B9",
+  "#D35400",
+  "#6B7A8D",
 ];
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Shared style helpers
-   ═══════════════════════════════════════════════════════════════════════════ */
+// Parse "₹3,200" → 3200
+function parseAmount(value: string): number {
+  return parseInt(String(value).replace(/[^0-9]/g, ""), 10) || 0;
+}
 
-const cardStyle: React.CSSProperties = {
-  background: T.card,
-  border: `1px solid ${T.border}`,
-  borderRadius: T.radius,
-  padding: 24,
-  fontFamily: T.font,
-};
+function formatDayTick(isoDate: string): string {
+  const d = new Date(isoDate);
+  if (Number.isNaN(d.getTime())) return isoDate;
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
 
-const cardHeaderStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  marginBottom: 20,
-};
+function CycleBanner({ cycle }: { cycle: Cycle }) {
+  const isActive = cycle.status === "active";
+  const nextCycle = (() => {
+    if (isActive) return null;
+    // For a closed cycle, try to identify the next active cycle from DEMO_CYCLES.
+    return DEMO_CYCLES.find((c) => c.status === "active") || null;
+  })();
 
-const cardTitleStyle: React.CSSProperties = {
-  fontSize: 15,
-  fontWeight: 600,
-  color: T.fg,
-  margin: 0,
-  lineHeight: 1.3,
-};
-
-const cardSubtitleStyle: React.CSSProperties = {
-  fontSize: 13,
-  color: T.muted,
-  margin: "2px 0 0",
-  fontWeight: 400,
-};
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   AvatarEditorPopover — simplified
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function AvatarEditorPopover({
-  initials,
-  avatarColor,
-  onSave,
-  onClose,
-}: {
-  initials: string;
-  avatarColor: string;
-  onSave: (initials: string, color: string) => void;
-  onClose: () => void;
-}) {
-  const [localInitials, setLocalInitials] = useState(initials);
-  const [localColor, setLocalColor] = useState(avatarColor);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onClose]);
+  const payrollCutoff = new Date(cycle.payrollCutoff).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 
   return (
     <div
-      ref={popoverRef}
+      role="status"
       style={{
-        position: "absolute",
-        top: "calc(100% + 8px)",
-        left: 0,
-        zIndex: 50,
-        background: T.card,
-        borderRadius: T.radius,
-        boxShadow: "0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)",
-        border: `1px solid ${T.border}`,
-        padding: 20,
-        width: 260,
-        fontFamily: T.font,
-      }}
-    >
-      {/* Preview */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <div
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: "50%",
-            background: localColor,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 700,
-            letterSpacing: "0.5px",
-            flexShrink: 0,
-          }}
-        >
-          {localInitials}
-        </div>
-        <div style={{ flex: 1 }}>
-          <label style={{ display: "block", fontSize: 11, color: T.muted, marginBottom: 4, fontWeight: 500 }}>
-            Initials
-          </label>
-          <input
-            value={localInitials}
-            maxLength={3}
-            onChange={(e) => setLocalInitials(e.target.value.toUpperCase())}
-            style={{
-              width: "100%",
-              padding: "6px 10px",
-              borderRadius: 8,
-              border: `1px solid ${T.border}`,
-              fontSize: 13,
-              fontFamily: T.font,
-              fontWeight: 600,
-              letterSpacing: "1px",
-              outline: "none",
-              textAlign: "center",
-              transition: "border-color 150ms",
-              boxSizing: "border-box",
-            }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = T.accent)}
-            onBlur={(e) => (e.currentTarget.style.borderColor = T.border)}
-          />
-        </div>
-      </div>
-
-      {/* Color grid */}
-      <label style={{ display: "block", fontSize: 11, color: T.muted, marginBottom: 8, fontWeight: 500 }}>
-        Color
-      </label>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6, marginBottom: 16 }}>
-        {AVATAR_COLORS.map((c) => (
-          <button
-            key={c}
-            onClick={() => setLocalColor(c)}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              background: c,
-              border: localColor === c ? `3px solid ${T.fg}` : "3px solid transparent",
-              cursor: "pointer",
-              transition: "transform 150ms",
-              outline: "none",
-              padding: 0,
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.12)")}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-          />
-        ))}
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          onClick={() => onSave(localInitials, localColor)}
-          style={{
-            flex: 1,
-            padding: "8px 0",
-            background: T.accent,
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            fontSize: 12,
-            fontWeight: 600,
-            fontFamily: T.font,
-            cursor: "pointer",
-            transition: "opacity 150ms",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-        >
-          Save
-        </button>
-        <button
-          onClick={onClose}
-          style={{
-            flex: 1,
-            padding: "8px 0",
-            background: "transparent",
-            color: T.muted,
-            border: `1px solid ${T.border}`,
-            borderRadius: 8,
-            fontSize: 12,
-            fontWeight: 500,
-            fontFamily: T.font,
-            cursor: "pointer",
-            transition: "background 150ms",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   Custom Recharts Tooltip
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div
-      style={{
-        background: T.fg,
-        color: "#fff",
-        padding: "10px 14px",
-        borderRadius: 8,
-        fontSize: 12,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-        lineHeight: 1.6,
-        fontFamily: T.font,
-      }}
-    >
-      <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 11, opacity: 0.7 }}>{label}</div>
-      {payload.map((p: any, i: number) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color, flexShrink: 0 }} />
-          <span style={{ opacity: 0.8 }}>{p.name}:</span>
-          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{p.value}%</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function SingleLineTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div
-      style={{
-        background: T.fg,
-        color: "#fff",
-        padding: "8px 12px",
-        borderRadius: 8,
-        fontSize: 12,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-        fontFamily: T.font,
-      }}
-    >
-      <div style={{ fontWeight: 600, marginBottom: 2, fontSize: 11, opacity: 0.7 }}>Day {label}</div>
-      {payload.map((p: any, i: number) => (
-        <div key={i}>
-          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-            {typeof p.value === "number" ? p.value.toLocaleString("en-IN") : p.value}
-          </span>
-          <span style={{ opacity: 0.7, marginLeft: 4 }}>{p.name}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TrendTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div
-      style={{
-        background: T.fg,
-        color: "#fff",
-        padding: "10px 14px",
-        borderRadius: 8,
-        fontSize: 12,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-        fontFamily: T.font,
-        lineHeight: 1.6,
-      }}
-    >
-      <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 11, opacity: 0.7 }}>{label}</div>
-      {payload.map((p: any, i: number) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 8, height: 3, borderRadius: 1, background: p.color, flexShrink: 0 }} />
-          <span style={{ opacity: 0.8 }}>{p.name}:</span>
-          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{p.value} Cr</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   DropdownSelector — small pill dropdown for chart headers
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function DropdownSelector({ value, options }: { value: string; options?: string[] }) {
-  return (
-    <button
-      style={{
-        display: "inline-flex",
+        ...font,
+        display: "flex",
         alignItems: "center",
-        gap: 4,
-        padding: "5px 10px",
-        background: T.bg,
-        border: `1px solid ${T.border}`,
-        borderRadius: 6,
-        fontSize: 12,
-        fontWeight: 500,
-        color: T.muted,
-        fontFamily: T.font,
-        cursor: "pointer",
-        transition: "border-color 150ms",
+        gap: 12,
+        padding: "12px 16px",
+        borderRadius: "var(--rounded-md)",
+        border: "1px solid var(--color-border)",
+        // Faintest accent tint — reads as paper, not alert.
+        backgroundColor: isActive ? "var(--brand-accent-alpha-8)" : "var(--color-surface)",
+        color: "var(--color-foreground)",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = T.mutedLight)}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.border)}
     >
-      {value}
-      <ChevronDown size={12} />
-    </button>
+      <CircleDot
+        size={14}
+        style={{
+          color: isActive ? "var(--brand-accent)" : "var(--color-muted-foreground)",
+          flexShrink: 0,
+        }}
+        aria-hidden
+      />
+      <p style={{ margin: 0, fontSize: "var(--text-sm)", lineHeight: 1.5 }}>
+        {isActive ? (
+          <>
+            <span style={{ fontWeight: 600 }}>
+              Current cycle: {cycle.label}
+            </span>
+            <span style={{ color: "var(--color-muted-foreground)" }}>
+              {" · "}Claims open · Payroll cutoff: <span style={{ fontVariantNumeric: "tabular-nums" }}>{payrollCutoff}</span>
+            </span>
+          </>
+        ) : (
+          <>
+            <span style={{ fontWeight: 600 }}>
+              Cycle {cycle.month} closed:
+            </span>
+            <span style={{ color: "var(--color-muted-foreground)" }}>
+              {" "}payroll exported.{nextCycle ? ` ${nextCycle.month} cycle active.` : ""}
+            </span>
+          </>
+        )}
+      </p>
+    </div>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Dashboard — main export
-   ═══════════════════════════════════════════════════════════════════════════ */
+// ─── KPI card ───────────────────────────────────────────────────────────────
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Static data for Benefits / Claims tabs
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-const BENEFIT_CATEGORIES = [
-  { name: "Food & Meals", limit: "2,200/mo", utilization: 78, color: T.accent },
-  { name: "Fuel & Travel", limit: "1,600/mo", utilization: 64, color: T.blue },
-  { name: "Communication", limit: "1,000/mo", utilization: 52, color: T.green },
-  { name: "Leave Travel", limit: "25,000/yr", utilization: 34, color: T.purple },
-  { name: "Professional Pursuit", limit: "15,000/yr", utilization: 41, color: T.amber },
-  { name: "Gadget Allowance", limit: "20,000/yr", utilization: 28, color: "#1ABC9C" },
-];
-
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   Dashboard — main export
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-export function Dashboard() {
-  const { profile, saveProfile } = useUserProfile();
-  const router = useRouter();
-  const isMobile = useIsMobile();
-
-  /* ─── State ─────────────────────────────────────────────────────────── */
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [setupRequired, setSetupRequired] = useState(false);
-  const [kpis, setKpis] = useState<any>(null);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  const [planDistribution, setPlanDistribution] = useState<any>(null);
-  const [showAvatarEditor, setShowAvatarEditor] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
-  /* ─── Fetch ─────────────────────────────────────────────────────────── */
-  const fetchDashboard = useCallback(async () => {
-    try {
-      setError(null);
-      // Always use demo data for client presentation
-      setSetupRequired(false);
-      setKpis(DEMO_DASHBOARD.kpis);
-      setRecentActivity(DEMO_DASHBOARD.recentActivity || []);
-      setPlanDistribution(DEMO_DASHBOARD.planDistribution || null);
-    } catch {
-      setKpis(DEMO_DASHBOARD.kpis);
-      setRecentActivity(DEMO_DASHBOARD.recentActivity || []);
-      setPlanDistribution(DEMO_DASHBOARD.planDistribution || null);
-      setSetupRequired(false);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await fetchDashboard();
-      toast.success("Dashboard refreshed");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to refresh dashboard");
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  /* ─── Avatar save ───────────────────────────────────────────────────── */
-  const handleAvatarSave = async (initials: string, color: string) => {
-    try {
-      await saveProfile({ initials, avatarColor: color });
-      toast.success("Avatar updated");
-      setShowAvatarEditor(false);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to update avatar");
-    }
-  };
-
-  /* ─── Activity ──────────────────────────────────────────────────────── */
-  const filteredActivity = recentActivity;
-
-  /* ─── Claim status counts for Claims tab ───────────────────────────── */
-  const claimStatusCounts = useMemo(() => {
-    let approved = 0, rejected = 0, pending = 0;
-    recentActivity.forEach((item) => {
-      const isApproved = item.action === "approved" || item.status === "approved";
-      const isRejected = item.action === "rejected" || item.status === "rejected";
-      if (isApproved) approved++;
-      else if (isRejected) rejected++;
-      else pending++;
-    });
-    return { approved, rejected, pending, total: recentActivity.length };
-  }, [recentActivity]);
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     LOADING STATE
-     ═══════════════════════════════════════════════════════════════════════ */
-  if (loading) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 480,
-          gap: 16,
-          color: T.muted,
-          fontFamily: T.font,
-        }}
-      >
-        <Loader2
-          size={28}
-          style={{ animation: "spin 1s linear infinite", color: T.accent }}
-        />
-        <span style={{ fontSize: 14, fontWeight: 500 }}>Loading dashboard...</span>
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      </div>
-    );
-  }
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     ERROR STATE
-     ═══════════════════════════════════════════════════════════════════════ */
-  if (error) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 480,
-          gap: 16,
-          fontFamily: T.font,
-        }}
-      >
-        <div
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            background: T.redBg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <AlertCircle size={24} style={{ color: T.red }} />
-        </div>
-        <p style={{ fontSize: 14, color: T.muted, maxWidth: 360, textAlign: "center", lineHeight: 1.6, margin: 0 }}>
-          {error}
-        </p>
-        <button
-          onClick={() => { setLoading(true); fetchDashboard(); }}
-          style={{
-            padding: "10px 24px",
-            background: T.accent,
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            fontSize: 14,
-            fontWeight: 600,
-            fontFamily: T.font,
-            cursor: "pointer",
-            transition: "opacity 150ms",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     KPI CONFIG
-     ═══════════════════════════════════════════════════════════════════════ */
-  const kpiMetrics = [
-    {
-      label: "Pending Approvals",
-      value: kpis?.pendingApprovals ?? "33",
-      trend: null,
-      trendUp: false,
-      isWarning: true,
-    },
-    {
-      label: "Active Employees",
-      value: kpis?.activeEmployees ?? "2,859",
-      trend: 4.9,
-      trendUp: true,
-    },
-  ];
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     RENDER
-     ═══════════════════════════════════════════════════════════════════════ */
+function KPI({
+  label,
+  value,
+  hint,
+  accent,
+  accentColor,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  accent?: boolean;
+  accentColor?: string;
+}) {
   return (
     <div
       style={{
+        ...font,
+        backgroundColor: "var(--color-card)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--rounded-md)",
+        padding: "var(--space-5)",
         display: "flex",
         flexDirection: "column",
-        gap: 24,
-        fontFamily: T.font,
-        maxWidth: 1280,
-        color: T.fg,
+        gap: 8,
+        minHeight: 128,
       }}
     >
-      {/* ─── 1. PAGE HEADER ────────────────────────────────────────────── */}
-      <div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "var(--color-muted-foreground)",
+          lineHeight: 1.3,
+        }}
+      >
+        <span>{label}</span>
+        {accent ? (
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              backgroundColor: accentColor || "var(--brand-amber)",
+              display: "inline-block",
+            }}
+            aria-hidden
+          />
+        ) : null}
+      </div>
+      <div
+        style={{
+          fontSize: 30,
+          fontWeight: 600,
+          lineHeight: 1.1,
+          fontVariantNumeric: "tabular-nums",
+          letterSpacing: "-0.01em",
+          color: "var(--color-foreground)",
+        }}
+      >
+        {value}
+      </div>
+      {hint ? (
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 16,
+            fontSize: "var(--text-xs)",
+            color: "var(--color-muted-foreground)",
+            lineHeight: 1.45,
           }}
         >
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 24,
-              fontWeight: 600,
-              color: T.fg,
-              letterSpacing: "-0.02em",
-              lineHeight: 1.3,
-            }}
-          >
-            Dashboard
-          </h1>
-
+          {hint}
         </div>
+      ) : null}
+    </div>
+  );
+}
 
+// ─── Chart card shell ───────────────────────────────────────────────────────
+
+function ChartCard({
+  title,
+  subtitle,
+  action,
+  children,
+  minHeight = 320,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  minHeight?: number;
+}) {
+  return (
+    <section
+      style={{
+        ...font,
+        backgroundColor: "var(--color-card)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--rounded-md)",
+        padding: "var(--space-5)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        minHeight,
+      }}
+    >
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <h2 style={{ margin: 0, fontSize: "var(--text-base)", fontWeight: 600, color: "var(--color-foreground)", letterSpacing: "-0.005em" }}>
+            {title}
+          </h2>
+          {subtitle ? (
+            <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", lineHeight: 1.45 }}>
+              {subtitle}
+            </p>
+          ) : null}
+        </div>
+        {action}
+      </header>
+      <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
+    </section>
+  );
+}
+
+// ─── Custom tooltips (restrained, single-purpose) ───────────────────────────
+
+function VolumeTooltip({ active, payload, label }: {
+  active?: boolean; payload?: { value: number; payload: { total: number } }[]; label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0];
+  return (
+    <div
+      style={{
+        backgroundColor: "var(--color-foreground)",
+        color: "#fff",
+        fontFamily: "'IBM Plex Sans', sans-serif",
+        padding: "8px 12px",
+        borderRadius: 8,
+        fontSize: "var(--text-xs)",
+        boxShadow: "var(--elevation-md)",
+        lineHeight: 1.5,
+      }}
+    >
+      <div style={{ opacity: 0.7, marginBottom: 2 }}>{label ? formatDayTick(label) : ""}</div>
+      <div style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+        {p.value} claim{p.value === 1 ? "" : "s"}
+      </div>
+    </div>
+  );
+}
+
+function CategoryTooltip({ active, payload }: {
+  active?: boolean; payload?: { name: string; value: number; payload: { color: string } }[];
+}) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0];
+  return (
+    <div
+      style={{
+        backgroundColor: "var(--color-foreground)",
+        color: "#fff",
+        fontFamily: "'IBM Plex Sans', sans-serif",
+        padding: "8px 12px",
+        borderRadius: 8,
+        fontSize: "var(--text-xs)",
+        boxShadow: "var(--elevation-md)",
+        lineHeight: 1.5,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: p.payload.color, display: "inline-block" }} />
+        <span style={{ opacity: 0.9 }}>{p.name}</span>
+      </div>
+      <div style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
+        {p.value} claim{p.value === 1 ? "" : "s"}
+      </div>
+    </div>
+  );
+}
+
+// ─── Dashboard main ─────────────────────────────────────────────────────────
+
+export function Dashboard() {
+  const [range, setRange] = useState<VolumeRange>("last_month");
+
+  // Current cycle (banner + KPI scope)
+  const currentCycle = useMemo<Cycle>(() => {
+    const c = DEMO_CYCLES.find((c) => c.id === CURRENT_CYCLE_ID);
+    return c ?? DEMO_CYCLES[DEMO_CYCLES.length - 1];
+  }, []);
+
+  // Claims scoped to the current cycle
+  const cycleClaims = useMemo<Claim[]>(
+    () => DEMO_CLAIMS.filter((c) => c.cycleId === currentCycle.id),
+    [currentCycle.id],
+  );
+
+  // ─── KPI math ─────────────────────────────────────────────────────────────
+
+  // "Submitted" means anything that's been entered into the system and is not
+  // merely eligible. We treat pending/approved/auto_approved/rejected/flagged
+  // as submissions.
+  const submittedCount = cycleClaims.filter(
+    (c) =>
+      c.status === "pending" ||
+      c.status === "submitted" ||
+      c.status === "claimed" ||
+      c.status === "invoice_pending" ||
+      c.status === "approved" ||
+      c.status === "auto_approved" ||
+      c.status === "rejected" ||
+      c.status === "flagged_for_later",
+  ).length;
+
+  const autoApprovedCount = cycleClaims.filter((c) => c.status === "auto_approved" || c.approvalSource === "auto").length;
+
+  // PRD note: the printed KPI formula in the spec was broken (it multiplied
+  // against `approvedCount`). Corrected formula: autoApproved ÷ submitted.
+  const autoApprovalRate =
+    submittedCount > 0 ? Math.round((autoApprovedCount / submittedCount) * 100) : 0;
+
+  const activeEmployeeIds = new Set(
+    cycleClaims
+      // Eligible-or-submitted claims mean the employee participated this cycle
+      .map((c) => c.employeeId)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const activeEmployees = activeEmployeeIds.size;
+
+  const approvedAmount = cycleClaims
+    .filter((c) => c.status === "approved" || c.status === "auto_approved")
+    .reduce((sum, c) => {
+      // Use allocationAmount when present — multi-month slice belongs to this cycle.
+      if (c.multiMonthAllocation) return sum + c.multiMonthAllocation.allocationAmount;
+      return sum + parseAmount(c.claimAmount);
+    }, 0);
+
+  const flaggedCount = cycleClaims.filter((c) => c.flaggedByAI === true).length;
+
+  const avgPerEmployee = activeEmployees > 0 ? Math.round(approvedAmount / activeEmployees) : 0;
+
+  // ─── Volume series ────────────────────────────────────────────────────────
+
+  const volumeSeries = useMemo(() => {
+    const days = range === "last_month" ? 30 : range === "last_3_months" ? 90 : 365;
+    const now = new Date();
+    const buckets = new Map<string, number>();
+    for (let i = days - 1; i >= 0; i -= 1) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      buckets.set(key, 0);
+    }
+    DEMO_CLAIMS.forEach((c) => {
+      if (!c.dateSubmitted) return;
+      if (buckets.has(c.dateSubmitted)) {
+        buckets.set(c.dateSubmitted, (buckets.get(c.dateSubmitted) || 0) + 1);
+      }
+    });
+    return Array.from(buckets.entries()).map(([date, total]) => ({ date, total }));
+  }, [range]);
+
+  // ─── Category distribution ────────────────────────────────────────────────
+
+  const categoryData = useMemo(() => {
+    const byCategory = new Map<string, number>();
+    cycleClaims.forEach((c) => {
+      byCategory.set(c.category, (byCategory.get(c.category) || 0) + 1);
+    });
+    // Map to the official labels from FLEXI_BENEFIT_CATEGORIES where possible.
+    const entries = Array.from(byCategory.entries()).map(([cat, count], idx) => {
+      const official = FLEXI_BENEFIT_CATEGORIES.find(
+        (c) => c.label.toLowerCase().startsWith(cat.toLowerCase()) || c.key.toLowerCase() === cat.toLowerCase(),
+      );
+      return {
+        name: official?.label ?? cat,
+        value: count,
+        color: CATEGORY_COLORS[idx % CATEGORY_COLORS.length],
+      };
+    });
+    return entries.sort((a, b) => b.value - a.value);
+  }, [cycleClaims]);
+
+  const rangeLabel: Record<VolumeRange, string> = {
+    last_month: "Last month",
+    last_3_months: "Last 3 months",
+    ytd: "Year to date",
+  };
+
+  return (
+    <div style={{ ...font, display: "flex", flexDirection: "column", gap: 24, maxWidth: 1360 }}>
+      {/* ─── Page header ────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <h1
+          style={{
+            margin: 0,
+            fontSize: "var(--text-2xl)",
+            fontWeight: 600,
+            letterSpacing: "-0.02em",
+            color: "var(--color-foreground)",
+            lineHeight: 1.2,
+          }}
+        >
+          Dashboard
+        </h1>
+        <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", lineHeight: 1.5 }}>
+          Cycle overview and claim health.
+        </p>
       </div>
 
-      {/* ─── SETUP REQUIRED STATE ──────────────────────────────────────── */}
-      {setupRequired && (
-        <div
-          style={{
-            ...cardStyle,
-            border: `1px dashed ${T.border}`,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            textAlign: "center",
-            minHeight: 400,
-            gap: 16,
-          }}
-        >
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: "50%",
-              background: T.blueBg,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Briefcase size={32} style={{ color: T.blue }} />
-          </div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: T.fg }}>
-            Welcome! Let's set up your benefits
-          </h2>
-          <p style={{ margin: 0, fontSize: 14, color: T.muted, maxWidth: 420, lineHeight: 1.7 }}>
-            Import employees to get started. Once you have employees enrolled in
-            benefit plans, your dashboard analytics will appear here.
-          </p>
-          <button
-            onClick={() => router.push("/onboarding")}
-            style={{
-              marginTop: 8,
-              padding: "12px 28px",
-              background: T.accent,
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              fontFamily: T.font,
-              cursor: "pointer",
-              transition: "opacity 150ms",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-          >
-            <Upload size={14} />
-            Start Setup
-          </button>
-        </div>
-      )}
+      {/* ─── Cycle banner ───────────────────────────────────────────── */}
+      <CycleBanner cycle={currentCycle} />
 
-      {/* ═══ MAIN DASHBOARD CONTENT ═══════════════════════════════════════ */}
-      {!setupRequired && (
-        <>
+      {/* ─── KPI grid ──────────────────────────────────────────────── */}
+      <div
+        style={{
+          display: "grid",
+          // Auto-fit at narrow widths; 5 columns when there's room.
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: 16,
+        }}
+      >
+        <KPI
+          label="Auto-Approval Rate"
+          value={`${autoApprovalRate}%`}
+          hint={autoApprovedCount + " of " + submittedCount + " claims"}
+        />
+        <KPI
+          label="Active Employees"
+          value={String(activeEmployees)}
+          hint={activeEmployees === 1 ? "Employee with claims this cycle" : "Employees with claims this cycle"}
+        />
+        <KPI
+          label="Total Benefits Claimed"
+          value={INR.format(approvedAmount)}
+          hint="Approved and auto-approved"
+        />
+        <KPI
+          label="Flagged Items"
+          value={String(flaggedCount)}
+          hint={flaggedCount === 0 ? "System is working smoothly" : `${flaggedCount} item${flaggedCount === 1 ? "" : "s"} need review`}
+          accent={flaggedCount > 0}
+          accentColor="var(--brand-amber)"
+        />
+        <KPI
+          label="Avg Claim per Employee"
+          value={INR.format(avgPerEmployee)}
+          hint="Based on approved amounts"
+        />
+      </div>
 
-          {/* ─── 2. PERFORMANCE SUMMARY ───────────────────────────────── */}
-          <div style={cardStyle}>
-            <div style={{ marginBottom: 20 }}>
-              <h2 style={{ ...cardTitleStyle, fontSize: 16 }}>Performance summary</h2>
-              <p style={cardSubtitleStyle}>View your key benefit metrics</p>
+      {/* ─── Charts row ────────────────────────────────────────────── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: 16,
+        }}
+      >
+        <ChartCard
+          title="Claims Volume"
+          subtitle="Daily claim submissions"
+          action={
+            <div style={{ position: "relative" }}>
+              <select
+                value={range}
+                onChange={(e) => setRange(e.target.value as VolumeRange)}
+                aria-label="Time range"
+                style={{
+                  ...font,
+                  appearance: "none",
+                  fontSize: "var(--text-xs)",
+                  fontWeight: 500,
+                  padding: "6px 28px 6px 12px",
+                  borderRadius: "var(--rounded-md)",
+                  border: "1px solid var(--color-border)",
+                  backgroundColor: "var(--color-background)",
+                  color: "var(--color-foreground)",
+                  cursor: "pointer",
+                  outline: "none",
+                  backgroundImage:
+                    "linear-gradient(45deg, transparent 50%, var(--color-muted-foreground) 50%), linear-gradient(135deg, var(--color-muted-foreground) 50%, transparent 50%)",
+                  backgroundPosition: "calc(100% - 14px) 50%, calc(100% - 10px) 50%",
+                  backgroundSize: "4px 4px, 4px 4px",
+                  backgroundRepeat: "no-repeat",
+                }}
+              >
+                <option value="last_month">{rangeLabel.last_month}</option>
+                <option value="last_3_months">{rangeLabel.last_3_months}</option>
+                <option value="ytd">{rangeLabel.ytd}</option>
+              </select>
             </div>
+          }
+        >
+          {volumeSeries.every((d) => d.total === 0) ? (
+            <ChartEmpty
+              icon={<TrendingUp size={22} />}
+              title="No volume to chart"
+              description="Claim submissions will appear as they arrive."
+            />
+          ) : (
+            <div style={{ width: "100%", height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={volumeSeries} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="volumeArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3D41FA" stopOpacity={0.18} />
+                      <stop offset="95%" stopColor="#3D41FA" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={formatDayTick}
+                    axisLine={false}
+                    tickLine={false}
+                    tickMargin={8}
+                    interval="preserveStartEnd"
+                    minTickGap={28}
+                    tick={{ fontFamily: "'IBM Plex Sans'", fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tickMargin={4}
+                    width={28}
+                    allowDecimals={false}
+                    tick={{ fontFamily: "'IBM Plex Sans'", fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                  />
+                  <Tooltip cursor={{ stroke: "var(--color-border)", strokeWidth: 1 }} content={<VolumeTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="total"
+                    stroke="#3D41FA"
+                    strokeWidth={1.75}
+                    fill="url(#volumeArea)"
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 2, fill: "var(--color-card)", stroke: "#3D41FA" }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartCard>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr 1fr" : `repeat(${kpiMetrics.length}, 1fr)`,
-                gap: isMobile ? 16 : 0,
-                borderTop: `1px solid ${T.border}`,
-                paddingTop: 20,
-              }}
-            >
-              {kpiMetrics.map((kpi, idx) => (
-                <div
-                  key={kpi.label}
-                  style={{
-                    padding: "0 20px",
-                    borderRight: idx < kpiMetrics.length - 1 ? `1px solid ${T.border}` : "none",
-                    /* First item needs no left padding */
-                    ...(idx === 0 ? { paddingLeft: 0 } : {}),
-                    /* Last item needs no right padding */
-                    ...(idx === kpiMetrics.length - 1 ? { paddingRight: 0 } : {}),
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: T.muted,
-                      fontWeight: 400,
-                      marginBottom: 8,
-                      lineHeight: 1.3,
-                    }}
-                  >
-                    {kpi.label}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 28,
-                      fontWeight: 700,
-                      color: T.fg,
-                      lineHeight: 1.1,
-                      fontVariantNumeric: "tabular-nums",
-                      letterSpacing: "-0.02em",
-                      marginBottom: 8,
-                    }}
-                  >
-                    {kpi.value}
-                  </div>
-                  <div
+        <ChartCard
+          title="Claims by Category"
+          subtitle="Distribution across benefit types this cycle"
+        >
+          {categoryData.length === 0 ? (
+            <ChartEmpty
+              icon={<Inbox size={22} />}
+              title="No categories yet"
+              description="Category breakdown appears as claims come in."
+            />
+          ) : (
+            <div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ width: 200, height: 200, flexShrink: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Tooltip content={<CategoryTooltip />} />
+                    <Pie
+                      data={categoryData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={60}
+                      outerRadius={92}
+                      strokeWidth={1}
+                      stroke="var(--color-card)"
+                      paddingAngle={1}
+                    >
+                      {categoryData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <ul
+                style={{
+                  listStyle: "none",
+                  margin: 0,
+                  padding: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  flex: 1,
+                  minWidth: 200,
+                }}
+              >
+                {categoryData.map((entry) => (
+                  <li
+                    key={entry.name}
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 4,
-                      fontSize: 12,
-                      lineHeight: 1.4,
+                      justifyContent: "space-between",
+                      gap: 12,
+                      fontSize: "var(--text-sm)",
                     }}
                   >
-                    {kpi.isWarning ? (
-                      <>
-                        <ArrowUpRight size={14} style={{ color: T.amber }} />
-                        <span style={{ color: T.amber, fontWeight: 600 }}>&uarr;</span>
-                        <span style={{ color: T.muted }}>from last month</span>
-                      </>
-                    ) : (
-                      <>
-                        {kpi.trendUp ? (
-                          <ArrowUpRight size={14} style={{ color: T.green }} />
-                        ) : (
-                          <ArrowDownRight size={14} style={{ color: T.red }} />
-                        )}
-                        <span
-                          style={{
-                            color: kpi.trendUp ? T.green : T.red,
-                            fontWeight: 600,
-                            fontVariantNumeric: "tabular-nums",
-                          }}
-                        >
-                          {kpi.trendUp ? "+" : "-"}{kpi.trend}%
-                        </span>
-                        <span style={{ color: T.muted }}>than last month</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
+                    <span style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--color-foreground)" }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: entry.color, display: "inline-block" }} />
+                      {entry.name}
+                    </span>
+                    <span
+                      style={{
+                        color: "var(--color-muted-foreground)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {entry.value}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
+          )}
+        </ChartCard>
+      </div>
+    </div>
+  );
+}
 
-          {/* ─── 3. CLAIMS OVERVIEW CHART ──────────────────────────────── */}
-          <div>
-            {/* Claims Overview — Area chart */}
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <div>
-                  <h3 style={cardTitleStyle}>Claims Overview</h3>
-                  <p style={cardSubtitleStyle}>Volume of claims processed</p>
-                </div>
-                <DropdownSelector value="Last month" />
-              </div>
+// ─── Chart empty state ──────────────────────────────────────────────────────
 
-              <div style={{ width: "100%", height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={CLAIMS_OVERVIEW_DATA} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="gradClaims" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={T.blue} stopOpacity={0.2} />
-                        <stop offset="95%" stopColor={T.blue} stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={T.border} vertical={false} />
-                    <XAxis
-                      dataKey="date"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
-                      tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
-                      domain={[0, 15000]}
-                    />
-                    <Tooltip content={<SingleLineTooltip />} />
-                    <Area
-                      type="monotone"
-                      dataKey="claims"
-                      name="Claims"
-                      stroke={T.blue}
-                      strokeWidth={2}
-                      fill="url(#gradClaims)"
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 2, fill: T.card }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          {/* ─── 5. RECENT ACTIVITY TABLE ─────────────────────────────── */}
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <div>
-                <h3 style={cardTitleStyle}>Recent Activity</h3>
-                <p style={cardSubtitleStyle}>Latest benefit claims and approvals</p>
-              </div>
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "transparent",
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 8,
-                  padding: "6px 14px",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: T.muted,
-                  fontFamily: T.font,
-                  cursor: refreshing ? "default" : "pointer",
-                  opacity: refreshing ? 0.6 : 1,
-                  transition: "background 150ms, border-color 150ms",
-                }}
-                onMouseEnter={(e) => {
-                  if (!refreshing) {
-                    e.currentTarget.style.background = T.bg;
-                    e.currentTarget.style.borderColor = T.mutedLight;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.borderColor = T.border;
-                }}
-              >
-                <RefreshCw
-                  size={13}
-                  style={{ animation: refreshing ? "spin 1s linear infinite" : "none" }}
-                />
-                Refresh
-              </button>
-            </div>
-
-            {filteredActivity.length === 0 ? (
-              /* Empty state */
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "48px 16px",
-                  color: T.muted,
-                  textAlign: "center",
-                }}
-              >
-                <FileText size={32} style={{ color: T.border, marginBottom: 12 }} />
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
-                  No recent activity
-                </p>
-                <p style={{ margin: "4px 0 0", fontSize: 12 }}>
-                  Approval actions will appear here
-                </p>
-              </div>
-            ) : (
-              /* Table */
-              <div style={{ overflowX: "auto" }}>
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: 13,
-                    fontFamily: T.font,
-                  }}
-                >
-                  <thead>
-                    <tr>
-                      {["Employee", "Benefit Type", "Amount", "Status", "Date"].map((col) => (
-                        <th
-                          key={col}
-                          style={{
-                            textAlign: "left",
-                            padding: "10px 12px",
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: T.muted,
-                            borderBottom: `1px solid ${T.border}`,
-                            letterSpacing: "0.02em",
-                            textTransform: "uppercase",
-                            whiteSpace: "nowrap",
-                            cursor: "pointer",
-                            userSelect: "none",
-                          }}
-                        >
-                          {col}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredActivity.map((item, idx) => {
-                      const isApproved = item.action === "approved" || item.status === "approved";
-                      const isRejected = item.action === "rejected" || item.status === "rejected";
-                      const isPending = !isApproved && !isRejected;
-                      const statusLabel = isApproved ? "Approved" : isRejected ? "Rejected" : "Pending";
-                      const statusColor = isApproved ? T.green : isRejected ? T.red : T.amber;
-                      const statusBg = isApproved ? T.greenBg : isRejected ? T.redBg : T.amberBg;
-
-                      return (
-                        <tr
-                          key={item.claimId || idx}
-                          style={{
-                            transition: "background 150ms",
-                            cursor: "default",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                        >
-                          {/* Employee */}
-                          <td
-                            style={{
-                              padding: "12px 12px",
-                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
-                              fontWeight: 500,
-                              color: T.fg,
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <div
-                                style={{
-                                  width: 30,
-                                  height: 30,
-                                  borderRadius: "50%",
-                                  background: item.avatarColor || T.blue,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  color: "#fff",
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  flexShrink: 0,
-                                  letterSpacing: "0.5px",
-                                }}
-                              >
-                                {item.initials || (item.employeeName || "").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
-                              </div>
-                              <span>{item.employeeName}</span>
-                            </div>
-                          </td>
-
-                          {/* Benefit Type */}
-                          <td
-                            style={{
-                              padding: "12px 12px",
-                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
-                              color: T.muted,
-                            }}
-                          >
-                            {item.type || item.category || "--"}
-                          </td>
-
-                          {/* Amount */}
-                          <td
-                            style={{
-                              padding: "12px 12px",
-                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
-                              fontWeight: 600,
-                              fontVariantNumeric: "tabular-nums",
-                              color: T.fg,
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {item.amount || "--"}
-                          </td>
-
-                          {/* Status badge */}
-                          <td
-                            style={{
-                              padding: "12px 12px",
-                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
-                            }}
-                          >
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 4,
-                                padding: "3px 10px",
-                                borderRadius: 100,
-                                fontSize: 11,
-                                fontWeight: 600,
-                                color: statusColor,
-                                background: statusBg,
-                                lineHeight: "16px",
-                              }}
-                            >
-                              {isApproved && <Check size={11} />}
-                              {isRejected && <X size={11} />}
-                              {isPending && <Clock size={11} />}
-                              {statusLabel}
-                            </span>
-                          </td>
-
-                          {/* Date */}
-                          <td
-                            style={{
-                              padding: "12px 12px",
-                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
-                              color: T.muted,
-                              fontSize: 12,
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {item.timestamp || item.dateSubmitted || "--"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-
-
-        </>
-      )}
-
-      {/* Keyframe animation for spinner */}
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+function ChartEmpty({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div
+      style={{
+        ...font,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        height: 260,
+        color: "var(--color-muted-foreground)",
+        textAlign: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: "var(--rounded-full)",
+          border: "1px solid var(--color-border)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {icon}
+      </div>
+      <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>{title}</p>
+      <p style={{ margin: 0, fontSize: "var(--text-xs)", lineHeight: 1.5, maxWidth: 240 }}>{description}</p>
     </div>
   );
 }
