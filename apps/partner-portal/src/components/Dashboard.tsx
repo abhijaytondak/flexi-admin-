@@ -1,226 +1,390 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import * as api from "@partner-portal/shared/api";
+import { useUserProfile } from "@partner-portal/shared/contexts/UserProfileContext";
+import { AVATAR_COLORS } from "@partner-portal/shared";
+import { DEMO_DASHBOARD, DEMO_EMPLOYEES } from "@partner-portal/shared/demo-data";
+import { useIsMobile } from "@partner-portal/shared/hooks/useIsMobile";
+import { getTimeGreeting, formatINR } from "@partner-portal/shared/helpers";
 import {
-  AlertTriangle,
-  ChevronDown,
-  CheckCircle2,
-  IndianRupee,
-  Sparkles,
   TrendingUp,
+  TrendingDown,
   Users,
-  Wallet,
+  IndianRupee,
+  ShieldCheck,
+  Clock,
+  AlertCircle,
+  Loader2,
+  RefreshCw,
+  Check,
+  X,
+  ChevronDown,
+  Pencil,
+  Upload,
+  MoreHorizontal,
+  ArrowUpRight,
+  ArrowDownRight,
+  FileText,
+  Briefcase,
 } from "lucide-react";
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
+  PieChart,
+  Pie,
   Cell,
   ResponsiveContainer,
   Tooltip,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
+  CartesianGrid,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  Legend,
 } from "recharts";
-import { StatCard } from "@partner-portal/ui";
-import {
-  CURRENT_CYCLE_ID,
-  DEMO_CLAIMS,
-  DEMO_CYCLES,
-} from "@partner-portal/shared/demo-data";
-import {
-  FLEXI_BENEFIT_CATEGORIES,
-  type Claim,
-  type ClaimStatus,
-  type Cycle,
-} from "@partner-portal/shared";
-import { useIsMobile } from "@partner-portal/shared/hooks/useIsMobile";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Design tokens — aligned with src/styles/theme.css
+   Design tokens — Microdose-inspired analytics dashboard
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const T = {
   font: "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  bg: "var(--color-surface)",
-  card: "var(--color-card)",
-  border: "var(--color-border)",
-  fg: "var(--color-foreground)",
-  muted: "var(--color-muted-foreground)",
-  accent: "var(--brand-accent)",
-  accentLight: "var(--brand-accent-light)",
-  green: "var(--brand-green)",
-  greenLight: "var(--brand-green-light)",
-  amber: "var(--brand-amber)",
-  amberLight: "var(--brand-amber-light)",
-  blue: "var(--brand-blue)",
-  blueLight: "var(--brand-blue-light)",
-  purple: "var(--brand-purple)",
-  purpleLight: "var(--brand-purple-light)",
-  orange: "var(--brand-orange)",
-  orangeLight: "var(--brand-orange-light)",
-  navy: "var(--brand-navy)",
-  radius: "var(--rounded-lg)",
+  bg: "#FAFAFA",
+  card: "#FFFFFF",
+  border: "#EBEBEB",
+  fg: "#1A1A1A",
+  muted: "#8C8C8C",
+  mutedLight: "#B3B3B3",
+  accent: "#E8683A",
+  green: "#27AE60",
+  greenBg: "#EAFAF1",
+  red: "#E74C3C",
+  redBg: "#FDEDEC",
+  amber: "#F39C12",
+  amberBg: "#FEF9E7",
+  blue: "#3498DB",
+  blueBg: "#EBF5FB",
+  purple: "#9B59B6",
+  radius: 12,
+  transition: "all 200ms ease",
 } as const;
 
-/* Raw hex palette for chart fills (Recharts can't resolve CSS vars reliably) */
-const CHART_PALETTE = {
-  accent: "#3D41FA",
-  blue: "#3498DB",
-  green: "#27AE60",
-  amber: "#F39C12",
-  purple: "#9B59B6",
-  orange: "#E67E22",
-  teal: "#1ABC9C",
-  navy: "#1A2B3C",
-  red: "#E74C3C",
-  slate: "#6B7280",
-  border: "#EBEBEB",
-  mutedText: "#6B7280",
-};
-
 /* ═══════════════════════════════════════════════════════════════════════════
-   Helpers
+   Static chart data — Benefit Utilization
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const currencyFormatter = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 0,
-});
-
-function formatIndianCurrency(value: number): string {
-  if (!Number.isFinite(value)) return "₹0";
-  return currencyFormatter.format(Math.round(value));
-}
-
-/** Parse "₹3,200" → 3200 */
-function parseClaimAmount(s: string | undefined): number {
-  if (!s) return 0;
-  const n = parseFloat(s.replace(/[^0-9.]/g, ""));
-  return Number.isFinite(n) ? n : 0;
-}
-
-function formatCutoffDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-/** Statuses we consider "submitted" for auto-approval math (current cycle funnel). */
-const SUBMITTED_STATUSES: ClaimStatus[] = [
-  "submitted",
-  "approved",
-  "auto_approved",
-  "rejected",
-  "flagged_for_later",
-  // include "pending" too — in this demo corpus, pending claims are the current
-  // queue and should count toward the submitted denominator for the cycle.
-  "pending",
+/* Claims Overview — daily volume over past month */
+const CLAIMS_OVERVIEW_DATA = [
+  { date: "1", claims: 820 },
+  { date: "3", claims: 1200 },
+  { date: "5", claims: 950 },
+  { date: "7", claims: 1800 },
+  { date: "9", claims: 2100 },
+  { date: "11", claims: 1600 },
+  { date: "13", claims: 3200 },
+  { date: "15", claims: 4500 },
+  { date: "17", claims: 3800 },
+  { date: "19", claims: 5200 },
+  { date: "21", claims: 6800 },
+  { date: "23", claims: 7200 },
+  { date: "25", claims: 9400 },
+  { date: "27", claims: 11200 },
+  { date: "29", claims: 12800 },
+  { date: "31", claims: 14200 },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Cycle context banner
+   Shared style helpers
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function CycleBanner({ cycles, currentId }: { cycles: Cycle[]; currentId: string }) {
-  const message = useMemo(() => {
-    const current = cycles.find((c) => c.id === currentId);
-    if (!current) return null;
-    if (current.status === "active") {
-      return `Current cycle: ${current.label} · Claims open · Payroll cutoff: ${formatCutoffDate(current.payrollCutoff)}`;
-    }
-    // Closed — find the next active/upcoming cycle if any
-    const next = cycles.find((c) => c.status === "active") ||
-      cycles.find((c) => new Date(c.submissionCutoff) > new Date(current.payrollCutoff));
-    const closedMonth = current.label.split(" ")[0];
-    const nextMonth = next ? next.label.split(" ")[0] : "Next";
-    return `Cycle ${closedMonth} closed: payroll exported. ${nextMonth} cycle active.`;
-  }, [cycles, currentId]);
+const cardStyle: React.CSSProperties = {
+  background: T.card,
+  border: `1px solid ${T.border}`,
+  borderRadius: T.radius,
+  padding: 24,
+  fontFamily: T.font,
+};
 
-  if (!message) return null;
+const cardHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: 20,
+};
+
+const cardTitleStyle: React.CSSProperties = {
+  fontSize: 15,
+  fontWeight: 600,
+  color: T.fg,
+  margin: 0,
+  lineHeight: 1.3,
+};
+
+const cardSubtitleStyle: React.CSSProperties = {
+  fontSize: 13,
+  color: T.muted,
+  margin: "2px 0 0",
+  fontWeight: 400,
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AvatarEditorPopover — simplified
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function AvatarEditorPopover({
+  initials,
+  avatarColor,
+  onSave,
+  onClose,
+}: {
+  initials: string;
+  avatarColor: string;
+  onSave: (initials: string, color: string) => void;
+  onClose: () => void;
+}) {
+  const [localInitials, setLocalInitials] = useState(initials);
+  const [localColor, setLocalColor] = useState(avatarColor);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
 
   return (
     <div
-      role="status"
-      aria-live="polite"
+      ref={popoverRef}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "10px 16px",
-        borderRadius: "var(--rounded-md)",
-        background: "var(--brand-accent-alpha-8)",
+        position: "absolute",
+        top: "calc(100% + 8px)",
+        left: 0,
+        zIndex: 50,
+        background: T.card,
+        borderRadius: T.radius,
+        boxShadow: "0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)",
         border: `1px solid ${T.border}`,
-        color: T.navy,
-        fontSize: "var(--text-sm)",
-        fontWeight: 500,
+        padding: 20,
+        width: 260,
         fontFamily: T.font,
       }}
     >
-      <Sparkles size={14} style={{ color: "var(--brand-accent)", flexShrink: 0 }} aria-hidden />
-      <span style={{ lineHeight: 1.5 }}>{message}</span>
+      {/* Preview */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            background: localColor,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: "0.5px",
+            flexShrink: 0,
+          }}
+        >
+          {localInitials}
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: "block", fontSize: 11, color: T.muted, marginBottom: 4, fontWeight: 500 }}>
+            Initials
+          </label>
+          <input
+            value={localInitials}
+            maxLength={3}
+            onChange={(e) => setLocalInitials(e.target.value.toUpperCase())}
+            style={{
+              width: "100%",
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: `1px solid ${T.border}`,
+              fontSize: 13,
+              fontFamily: T.font,
+              fontWeight: 600,
+              letterSpacing: "1px",
+              outline: "none",
+              textAlign: "center",
+              transition: "border-color 150ms",
+              boxSizing: "border-box",
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = T.accent)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = T.border)}
+          />
+        </div>
+      </div>
+
+      {/* Color grid */}
+      <label style={{ display: "block", fontSize: 11, color: T.muted, marginBottom: 8, fontWeight: 500 }}>
+        Color
+      </label>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6, marginBottom: 16 }}>
+        {AVATAR_COLORS.map((c) => (
+          <button
+            key={c}
+            onClick={() => setLocalColor(c)}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background: c,
+              border: localColor === c ? `3px solid ${T.fg}` : "3px solid transparent",
+              cursor: "pointer",
+              transition: "transform 150ms",
+              outline: "none",
+              padding: 0,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.12)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          />
+        ))}
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={() => onSave(localInitials, localColor)}
+          style={{
+            flex: 1,
+            padding: "8px 0",
+            background: T.accent,
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: T.font,
+            cursor: "pointer",
+            transition: "opacity 150ms",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+        >
+          Save
+        </button>
+        <button
+          onClick={onClose}
+          style={{
+            flex: 1,
+            padding: "8px 0",
+            background: "transparent",
+            color: T.muted,
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            fontSize: 12,
+            fontWeight: 500,
+            fontFamily: T.font,
+            cursor: "pointer",
+            transition: "background 150ms",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Chart tooltip
+   Custom Recharts Tooltip
    ═══════════════════════════════════════════════════════════════════════════ */
 
-interface TooltipPayloadEntry {
-  color?: string;
-  name?: string;
-  value?: number | string;
-  dataKey?: string;
-}
-
-function ChartTooltip({
-  active,
-  payload,
-  label,
-  valueFormatter,
-}: {
-  active?: boolean;
-  payload?: TooltipPayloadEntry[];
-  label?: string;
-  valueFormatter?: (value: number | string) => string;
-}) {
+function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div
       style={{
-        background: "#1A1A1A",
+        background: T.fg,
+        color: "#fff",
+        padding: "10px 14px",
+        borderRadius: 8,
+        fontSize: 12,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+        lineHeight: 1.6,
+        fontFamily: T.font,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 11, opacity: 0.7 }}>{label}</div>
+      {payload.map((p: any, i: number) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color, flexShrink: 0 }} />
+          <span style={{ opacity: 0.8 }}>{p.name}:</span>
+          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{p.value}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SingleLineTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div
+      style={{
+        background: T.fg,
         color: "#fff",
         padding: "8px 12px",
         borderRadius: 8,
         fontSize: 12,
         boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
         fontFamily: T.font,
-        lineHeight: 1.5,
       }}
     >
-      {label !== undefined && (
-        <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 11, opacity: 0.7 }}>
-          {label}
-        </div>
-      )}
-      {payload.map((p, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {p.color && (
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: p.color, display: "inline-block" }} />
-          )}
-          <span style={{ opacity: 0.85 }}>{p.name}:</span>
+      <div style={{ fontWeight: 600, marginBottom: 2, fontSize: 11, opacity: 0.7 }}>Day {label}</div>
+      {payload.map((p: any, i: number) => (
+        <div key={i}>
           <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-            {valueFormatter ? valueFormatter(p.value ?? 0) : p.value}
+            {typeof p.value === "number" ? p.value.toLocaleString("en-IN") : p.value}
           </span>
+          <span style={{ opacity: 0.7, marginLeft: 4 }}>{p.name}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TrendTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div
+      style={{
+        background: T.fg,
+        color: "#fff",
+        padding: "10px 14px",
+        borderRadius: 8,
+        fontSize: 12,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+        fontFamily: T.font,
+        lineHeight: 1.6,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 11, opacity: 0.7 }}>{label}</div>
+      {payload.map((p: any, i: number) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 8, height: 3, borderRadius: 1, background: p.color, flexShrink: 0 }} />
+          <span style={{ opacity: 0.8 }}>{p.name}:</span>
+          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{p.value} Cr</span>
         </div>
       ))}
     </div>
@@ -228,540 +392,721 @@ function ChartTooltip({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Range selector (native select styled as pill)
+   DropdownSelector — small pill dropdown for chart headers
    ═══════════════════════════════════════════════════════════════════════════ */
 
-type RangeKey = "last_month" | "last_3_months" | "ytd";
-
-const RANGE_OPTIONS: { key: RangeKey; label: string; days?: number }[] = [
-  { key: "last_month", label: "Last Month", days: 30 },
-  { key: "last_3_months", label: "Last 3 Months", days: 90 },
-  { key: "ytd", label: "YTD" },
-];
-
-function RangeSelector({
-  value,
-  onChange,
-}: {
-  value: RangeKey;
-  onChange: (next: RangeKey) => void;
-}) {
+function DropdownSelector({ value, options }: { value: string; options?: string[] }) {
   return (
-    <label
+    <button
       style={{
-        position: "relative",
         display: "inline-flex",
         alignItems: "center",
+        gap: 4,
+        padding: "5px 10px",
+        background: T.bg,
+        border: `1px solid ${T.border}`,
+        borderRadius: 6,
+        fontSize: 12,
+        fontWeight: 500,
+        color: T.muted,
+        fontFamily: T.font,
+        cursor: "pointer",
+        transition: "border-color 150ms",
       }}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = T.mutedLight)}
+      onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.border)}
     >
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as RangeKey)}
-        aria-label="Time range"
-        style={{
-          appearance: "none",
-          WebkitAppearance: "none",
-          MozAppearance: "none",
-          padding: "5px 26px 5px 10px",
-          background: T.bg,
-          border: `1px solid ${T.border}`,
-          borderRadius: 6,
-          fontSize: 12,
-          fontWeight: 500,
-          color: T.muted,
-          fontFamily: T.font,
-          cursor: "pointer",
-          outline: "none",
-        }}
-      >
-        {RANGE_OPTIONS.map((o) => (
-          <option key={o.key} value={o.key}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        size={12}
-        style={{
-          position: "absolute",
-          right: 8,
-          pointerEvents: "none",
-          color: T.muted,
-        }}
-      />
-    </label>
+      {value}
+      <ChevronDown size={12} />
+    </button>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Dashboard — PRD §4.1
+   Dashboard — main export
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Static data for Benefits / Claims tabs
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const BENEFIT_CATEGORIES = [
+  { name: "Food & Meals", limit: "2,200/mo", utilization: 78, color: T.accent },
+  { name: "Fuel & Travel", limit: "1,600/mo", utilization: 64, color: T.blue },
+  { name: "Communication", limit: "1,000/mo", utilization: 52, color: T.green },
+  { name: "Leave Travel", limit: "25,000/yr", utilization: 34, color: T.purple },
+  { name: "Professional Pursuit", limit: "15,000/yr", utilization: 41, color: T.amber },
+  { name: "Gadget Allowance", limit: "20,000/yr", utilization: 28, color: "#1ABC9C" },
+];
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dashboard — main export
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export function Dashboard() {
+  const { profile, saveProfile } = useUserProfile();
+  const router = useRouter();
   const isMobile = useIsMobile();
-  const [rangeKey, setRangeKey] = useState<RangeKey>("last_month");
 
-  /* ─── Current-cycle claims ────────────────────────────────────────── */
-  const currentCycleClaims = useMemo<Claim[]>(
-    () => DEMO_CLAIMS.filter((c) => c.cycleId === CURRENT_CYCLE_ID),
-    []
-  );
+  /* ─── State ─────────────────────────────────────────────────────────── */
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [setupRequired, setSetupRequired] = useState(false);
+  const [kpis, setKpis] = useState<any>(null);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [planDistribution, setPlanDistribution] = useState<any>(null);
+  const [showAvatarEditor, setShowAvatarEditor] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  /* ─── KPIs ────────────────────────────────────────────────────────── */
-  const kpis = useMemo(() => {
-    // Eligible denominator: claims in current cycle that entered the review funnel.
-    const eligible = currentCycleClaims.filter((c) => SUBMITTED_STATUSES.includes(c.status));
-
-    // NOTE: PRD §4.1 printed formula for Auto-Approval Rate is broken
-    // (divides auto-approved by a set that excludes auto-approved itself).
-    // Using corrected denominator: all submitted/reviewed claims this cycle.
-    // autoApprovalRate = autoApprovedCount / submittedCount * 100
-    const autoApprovedCount = eligible.filter(
-      (c) => c.status === "auto_approved" || c.approvalSource === "auto"
-    ).length;
-    const submittedCount = eligible.length;
-    const autoApprovalRate = submittedCount > 0
-      ? Math.round((autoApprovedCount / submittedCount) * 100)
-      : 0;
-
-    // Active employees: unique employeeIds with ≥1 eligible claim this cycle
-    const activeEmployeeSet = new Set<string>();
-    eligible.forEach((c) => {
-      if (c.employeeId) activeEmployeeSet.add(c.employeeId);
-    });
-    const activeEmployees = activeEmployeeSet.size;
-
-    // Total Benefits Claimed: sum of approved + auto-approved amounts this cycle
-    const totalClaimed = currentCycleClaims
-      .filter((c) => c.status === "approved" || c.status === "auto_approved")
-      .reduce((sum, c) => sum + parseClaimAmount(c.claimAmount), 0);
-
-    // Flagged items
-    const flaggedCount = currentCycleClaims.filter((c) => c.flaggedByAI === true).length;
-
-    // Avg claim per employee
-    const avgPerEmployee = activeEmployees > 0 ? totalClaimed / activeEmployees : 0;
-
-    return {
-      autoApprovalRate,
-      autoApprovedCount,
-      submittedCount,
-      activeEmployees,
-      totalClaimed,
-      flaggedCount,
-      avgPerEmployee,
-    };
-  }, [currentCycleClaims]);
-
-  /* ─── Claims Volume Over Time ─────────────────────────────────────── */
-  const volumeData = useMemo(() => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const range = RANGE_OPTIONS.find((r) => r.key === rangeKey)!;
-
-    let from: Date;
-    if (rangeKey === "ytd") {
-      from = new Date(currentYear, 0, 1);
-    } else {
-      from = new Date(now);
-      from.setDate(from.getDate() - (range.days ?? 30));
+  /* ─── Fetch ─────────────────────────────────────────────────────────── */
+  const fetchDashboard = useCallback(async () => {
+    try {
+      setError(null);
+      // Always use demo data for client presentation
+      setSetupRequired(false);
+      setKpis(DEMO_DASHBOARD.kpis);
+      setRecentActivity(DEMO_DASHBOARD.recentActivity || []);
+      setPlanDistribution(DEMO_DASHBOARD.planDistribution || null);
+    } catch {
+      setKpis(DEMO_DASHBOARD.kpis);
+      setRecentActivity(DEMO_DASHBOARD.recentActivity || []);
+      setPlanDistribution(DEMO_DASHBOARD.planDistribution || null);
+      setSetupRequired(false);
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    const buckets = new Map<string, number>();
-    DEMO_CLAIMS.forEach((c) => {
-      if (!c.dateSubmitted) return;
-      const d = new Date(c.dateSubmitted);
-      if (Number.isNaN(d.getTime())) return;
-      if (d < from || d > now) return;
-      const key = c.dateSubmitted; // yyyy-mm-dd already
-      buckets.set(key, (buckets.get(key) ?? 0) + 1);
-    });
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
-    // Fill in missing days across range for a continuous line
-    const points: { date: string; label: string; claims: number }[] = [];
-    const cursor = new Date(from);
-    while (cursor <= now) {
-      const key = cursor.toISOString().split("T")[0];
-      const d = new Date(cursor);
-      points.push({
-        date: key,
-        label: d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
-        claims: buckets.get(key) ?? 0,
-      });
-      cursor.setDate(cursor.getDate() + 1);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchDashboard();
+      toast.success("Dashboard refreshed");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to refresh dashboard");
+    } finally {
+      setRefreshing(false);
     }
-    return points;
-  }, [rangeKey]);
+  };
 
-  /* ─── Claims by Category ──────────────────────────────────────────── */
-  const categoryData = useMemo(() => {
-    const counts = new Map<string, number>();
-    currentCycleClaims.forEach((c) => {
-      const key = c.benefitType || c.category || "Other";
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+  /* ─── Avatar save ───────────────────────────────────────────────────── */
+  const handleAvatarSave = async (initials: string, color: string) => {
+    try {
+      await saveProfile({ initials, avatarColor: color });
+      toast.success("Avatar updated");
+      setShowAvatarEditor(false);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update avatar");
+    }
+  };
+
+  /* ─── Activity ──────────────────────────────────────────────────────── */
+  const filteredActivity = recentActivity;
+
+  /* ─── Claim status counts for Claims tab ───────────────────────────── */
+  const claimStatusCounts = useMemo(() => {
+    let approved = 0, rejected = 0, pending = 0;
+    recentActivity.forEach((item) => {
+      const isApproved = item.action === "approved" || item.status === "approved";
+      const isRejected = item.action === "rejected" || item.status === "rejected";
+      if (isApproved) approved++;
+      else if (isRejected) rejected++;
+      else pending++;
     });
+    return { approved, rejected, pending, total: recentActivity.length };
+  }, [recentActivity]);
 
-    // Order by FLEXI_BENEFIT_CATEGORIES label list, then any extras alphabetically
-    const known = FLEXI_BENEFIT_CATEGORIES.map((c) => c.label);
-    const knownWithCounts = known
-      .map((label) => ({ label, count: counts.get(label) ?? 0 }))
-      .filter((d) => d.count > 0);
+  /* ═══════════════════════════════════════════════════════════════════════
+     LOADING STATE
+     ═══════════════════════════════════════════════════════════════════════ */
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: 480,
+          gap: 16,
+          color: T.muted,
+          fontFamily: T.font,
+        }}
+      >
+        <Loader2
+          size={28}
+          style={{ animation: "spin 1s linear infinite", color: T.accent }}
+        />
+        <span style={{ fontSize: 14, fontWeight: 500 }}>Loading dashboard...</span>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    );
+  }
 
-    const extras: { label: string; count: number }[] = [];
-    counts.forEach((count, label) => {
-      if (!known.includes(label)) extras.push({ label, count });
-    });
-    extras.sort((a, b) => b.count - a.count);
+  /* ═══════════════════════════════════════════════════════════════════════
+     ERROR STATE
+     ═══════════════════════════════════════════════════════════════════════ */
+  if (error) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: 480,
+          gap: 16,
+          fontFamily: T.font,
+        }}
+      >
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: "50%",
+            background: T.redBg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <AlertCircle size={24} style={{ color: T.red }} />
+        </div>
+        <p style={{ fontSize: 14, color: T.muted, maxWidth: 360, textAlign: "center", lineHeight: 1.6, margin: 0 }}>
+          {error}
+        </p>
+        <button
+          onClick={() => { setLoading(true); fetchDashboard(); }}
+          style={{
+            padding: "10px 24px",
+            background: T.accent,
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            fontFamily: T.font,
+            cursor: "pointer",
+            transition: "opacity 150ms",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
-    const rows = [...knownWithCounts, ...extras];
+  /* ═══════════════════════════════════════════════════════════════════════
+     KPI CONFIG
+     ═══════════════════════════════════════════════════════════════════════ */
+  const kpiMetrics = [
+    {
+      label: "Pending Approvals",
+      value: kpis?.pendingApprovals ?? "33",
+      trend: null,
+      trendUp: false,
+      isWarning: true,
+    },
+    {
+      label: "Active Employees",
+      value: kpis?.activeEmployees ?? "2,859",
+      trend: 4.9,
+      trendUp: true,
+    },
+  ];
 
-    // Assign colors from palette cyclically
-    const palette = [
-      CHART_PALETTE.accent,
-      CHART_PALETTE.blue,
-      CHART_PALETTE.green,
-      CHART_PALETTE.amber,
-      CHART_PALETTE.purple,
-      CHART_PALETTE.orange,
-      CHART_PALETTE.teal,
-      CHART_PALETTE.navy,
-    ];
-    return rows.map((r, i) => ({ ...r, color: palette[i % palette.length] }));
-  }, [currentCycleClaims]);
-
-  /* ─── Derived styles / labels ─────────────────────────────────────── */
-  const flaggedSubtitle = kpis.flaggedCount === 0
-    ? "All clear — nothing needs review"
-    : `${kpis.flaggedCount} ${kpis.flaggedCount === 1 ? "item needs" : "items need"} review`;
-
-  /* ─── Render ──────────────────────────────────────────────────────── */
+  /* ═══════════════════════════════════════════════════════════════════════
+     RENDER
+     ═══════════════════════════════════════════════════════════════════════ */
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: "var(--space-6)",
+        gap: 24,
         fontFamily: T.font,
-        color: T.fg,
         maxWidth: 1280,
+        color: T.fg,
       }}
     >
-      {/* Page header */}
+      {/* ─── 1. PAGE HEADER ────────────────────────────────────────────── */}
       <div>
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "var(--text-2xl)",
-            fontWeight: 600,
-            color: T.fg,
-            letterSpacing: "-0.02em",
-            lineHeight: 1.2,
-          }}
-        >
-          Dashboard
-        </h1>
-        <p
-          style={{
-            margin: "var(--space-1) 0 0",
-            fontSize: "var(--text-sm)",
-            color: T.muted,
-            fontWeight: 400,
-          }}
-        >
-          Benefits are running on auto-pilot. Review only what needs your attention.
-        </p>
-      </div>
-
-      {/* Cycle context banner */}
-      <CycleBanner cycles={DEMO_CYCLES} currentId={CURRENT_CYCLE_ID} />
-
-      {/* KPI grid — 5 cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: isMobile
-            ? "1fr"
-            : "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "var(--space-4)",
-        }}
-      >
-        <StatCard
-          title="Auto-Approval Rate"
-          value={`${kpis.autoApprovalRate}%`}
-          change={`${kpis.autoApprovedCount}/${kpis.submittedCount} this cycle`}
-          trend="up"
-          icon={Sparkles}
-          color={CHART_PALETTE.accent}
-          bgColor="var(--brand-accent-light)"
-        />
-        <StatCard
-          title="Active Employees"
-          value={kpis.activeEmployees.toLocaleString("en-IN")}
-          change="with ≥1 eligible claim"
-          trend="up"
-          icon={Users}
-          color={CHART_PALETTE.blue}
-          bgColor="var(--brand-blue-light)"
-        />
-        <StatCard
-          title="Total Benefits Claimed"
-          value={formatIndianCurrency(kpis.totalClaimed)}
-          change="approved + auto-approved"
-          trend="up"
-          icon={Wallet}
-          color={CHART_PALETTE.green}
-          bgColor="var(--brand-green-light)"
-        />
-        <StatCard
-          title="Flagged Items"
-          value={kpis.flaggedCount.toLocaleString("en-IN")}
-          change={flaggedSubtitle}
-          /* Only surface the amber "alert" treatment when there's actually something to review.
-             PRD: "Default state: everything is fine." */
-          trend={kpis.flaggedCount > 0 ? "alert" : "up"}
-          icon={kpis.flaggedCount > 0 ? AlertTriangle : CheckCircle2}
-          color={kpis.flaggedCount > 0 ? CHART_PALETTE.amber : CHART_PALETTE.green}
-          bgColor={kpis.flaggedCount > 0 ? "var(--brand-amber-light)" : "var(--brand-green-light)"}
-        />
-        <StatCard
-          title="Avg Claim per Employee"
-          value={formatIndianCurrency(kpis.avgPerEmployee)}
-          change="this cycle"
-          trend="up"
-          icon={IndianRupee}
-          color={CHART_PALETTE.purple}
-          bgColor="var(--brand-purple-light)"
-        />
-      </div>
-
-      {/* Charts row — side-by-side desktop, stacked mobile */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-          gap: "var(--space-4)",
-        }}
-      >
-        {/* Claims Volume Over Time */}
         <div
           style={{
-            background: T.card,
-            border: `1px solid ${T.border}`,
-            borderRadius: T.radius,
-            padding: "var(--space-5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
           }}
         >
-          <div
+          <h1
             style={{
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              marginBottom: "var(--space-4)",
-              gap: 12,
+              margin: 0,
+              fontSize: 24,
+              fontWeight: 600,
+              color: T.fg,
+              letterSpacing: "-0.02em",
+              lineHeight: 1.3,
             }}
           >
-            <div>
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: "var(--text-base)",
-                  fontWeight: 600,
-                  color: T.fg,
-                  lineHeight: 1.3,
-                }}
-              >
-                Claims Volume Over Time
-              </h3>
-              <p
-                style={{
-                  margin: "2px 0 0",
-                  fontSize: "var(--text-xs)",
-                  color: T.muted,
-                  fontWeight: 400,
-                }}
-              >
-                Daily claims submitted
-              </p>
-            </div>
-            <RangeSelector value={rangeKey} onChange={setRangeKey} />
-          </div>
+            Dashboard
+          </h1>
 
-          <div style={{ width: "100%", height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={volumeData}
-                margin={{ top: 8, right: 12, left: -12, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="dashClaimsGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={CHART_PALETTE.accent} stopOpacity={0.22} />
-                    <stop offset="95%" stopColor={CHART_PALETTE.accent} stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke={CHART_PALETTE.border}
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="label"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: CHART_PALETTE.mutedText, fontFamily: T.font }}
-                  interval="preserveStartEnd"
-                  minTickGap={24}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                  tick={{ fontSize: 11, fill: CHART_PALETTE.mutedText, fontFamily: T.font }}
-                />
-                <Tooltip
-                  content={
-                    <ChartTooltip
-                      valueFormatter={(v) => `${v} claim${Number(v) === 1 ? "" : "s"}`}
-                    />
-                  }
-                  cursor={{ stroke: CHART_PALETTE.border, strokeWidth: 1 }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="claims"
-                  name="Claims"
-                  stroke={CHART_PALETTE.accent}
-                  strokeWidth={2}
-                  fill="url(#dashClaimsGrad)"
-                  dot={false}
-                  activeDot={{ r: 4, strokeWidth: 2, fill: "#fff" }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
         </div>
 
-        {/* Claims by Category */}
+      </div>
+
+      {/* ─── SETUP REQUIRED STATE ──────────────────────────────────────── */}
+      {setupRequired && (
         <div
           style={{
-            background: T.card,
-            border: `1px solid ${T.border}`,
-            borderRadius: T.radius,
-            padding: "var(--space-5)",
+            ...cardStyle,
+            border: `1px dashed ${T.border}`,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            minHeight: 400,
+            gap: 16,
           }}
         >
           <div
             style={{
+              width: 72,
+              height: 72,
+              borderRadius: "50%",
+              background: T.blueBg,
               display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              marginBottom: "var(--space-4)",
-              gap: 12,
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            <div>
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: "var(--text-base)",
-                  fontWeight: 600,
-                  color: T.fg,
-                  lineHeight: 1.3,
-                }}
-              >
-                Claims by Category
-              </h3>
-              <p
-                style={{
-                  margin: "2px 0 0",
-                  fontSize: "var(--text-xs)",
-                  color: T.muted,
-                  fontWeight: 400,
-                }}
-              >
-                Distribution across flexi-benefit categories
-              </p>
-            </div>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                padding: "3px 8px",
-                borderRadius: "var(--rounded-full)",
-                fontSize: 11,
-                fontWeight: 500,
-                color: T.muted,
-                background: T.bg,
-                border: `1px solid ${T.border}`,
-              }}
-            >
-              <TrendingUp size={11} />
-              Current cycle
-            </span>
+            <Briefcase size={32} style={{ color: T.blue }} />
           </div>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: T.fg }}>
+            Welcome! Let's set up your benefits
+          </h2>
+          <p style={{ margin: 0, fontSize: 14, color: T.muted, maxWidth: 420, lineHeight: 1.7 }}>
+            Import employees to get started. Once you have employees enrolled in
+            benefit plans, your dashboard analytics will appear here.
+          </p>
+          <button
+            onClick={() => router.push("/onboarding")}
+            style={{
+              marginTop: 8,
+              padding: "12px 28px",
+              background: T.accent,
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              fontFamily: T.font,
+              cursor: "pointer",
+              transition: "opacity 150ms",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+          >
+            <Upload size={14} />
+            Start Setup
+          </button>
+        </div>
+      )}
 
-          {categoryData.length === 0 ? (
+      {/* ═══ MAIN DASHBOARD CONTENT ═══════════════════════════════════════ */}
+      {!setupRequired && (
+        <>
+
+          {/* ─── 2. PERFORMANCE SUMMARY ───────────────────────────────── */}
+          <div style={cardStyle}>
+            <div style={{ marginBottom: 20 }}>
+              <h2 style={{ ...cardTitleStyle, fontSize: 16 }}>Performance summary</h2>
+              <p style={cardSubtitleStyle}>View your key benefit metrics</p>
+            </div>
+
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                height: 260,
-                color: T.muted,
-                fontSize: 13,
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr 1fr" : `repeat(${kpiMetrics.length}, 1fr)`,
+                gap: isMobile ? 16 : 0,
+                borderTop: `1px solid ${T.border}`,
+                paddingTop: 20,
               }}
             >
-              No claims yet this cycle
-            </div>
-          ) : (
-            <div style={{ width: "100%", height: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={categoryData}
-                  layout="vertical"
-                  margin={{ top: 4, right: 16, left: 8, bottom: 0 }}
+              {kpiMetrics.map((kpi, idx) => (
+                <div
+                  key={kpi.label}
+                  style={{
+                    padding: "0 20px",
+                    borderRight: idx < kpiMetrics.length - 1 ? `1px solid ${T.border}` : "none",
+                    /* First item needs no left padding */
+                    ...(idx === 0 ? { paddingLeft: 0 } : {}),
+                    /* Last item needs no right padding */
+                    ...(idx === kpiMetrics.length - 1 ? { paddingRight: 0 } : {}),
+                  }}
                 >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={CHART_PALETTE.border}
-                    horizontal={false}
-                  />
-                  <XAxis
-                    type="number"
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                    tick={{ fontSize: 11, fill: CHART_PALETTE.mutedText, fontFamily: T.font }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="label"
-                    axisLine={false}
-                    tickLine={false}
-                    width={140}
-                    tick={{ fontSize: 11, fill: CHART_PALETTE.mutedText, fontFamily: T.font }}
-                  />
-                  <Tooltip
-                    content={
-                      <ChartTooltip
-                        valueFormatter={(v) => `${v} claim${Number(v) === 1 ? "" : "s"}`}
-                      />
-                    }
-                    cursor={{ fill: "rgba(0,0,0,0.03)" }}
-                  />
-                  <Bar dataKey="count" name="Claims" radius={[0, 6, 6, 0]} fill={CHART_PALETTE.accent}>
-                    {/* Individual bar colors via cells */}
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`bar-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: T.muted,
+                      fontWeight: 400,
+                      marginBottom: 8,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {kpi.label}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 28,
+                      fontWeight: 700,
+                      color: T.fg,
+                      lineHeight: 1.1,
+                      fontVariantNumeric: "tabular-nums",
+                      letterSpacing: "-0.02em",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {kpi.value}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: 12,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {kpi.isWarning ? (
+                      <>
+                        <ArrowUpRight size={14} style={{ color: T.amber }} />
+                        <span style={{ color: T.amber, fontWeight: 600 }}>&uarr;</span>
+                        <span style={{ color: T.muted }}>from last month</span>
+                      </>
+                    ) : (
+                      <>
+                        {kpi.trendUp ? (
+                          <ArrowUpRight size={14} style={{ color: T.green }} />
+                        ) : (
+                          <ArrowDownRight size={14} style={{ color: T.red }} />
+                        )}
+                        <span
+                          style={{
+                            color: kpi.trendUp ? T.green : T.red,
+                            fontWeight: 600,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {kpi.trendUp ? "+" : "-"}{kpi.trend}%
+                        </span>
+                        <span style={{ color: T.muted }}>than last month</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+
+          {/* ─── 3. CLAIMS OVERVIEW CHART ──────────────────────────────── */}
+          <div>
+            {/* Claims Overview — Area chart */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <div>
+                  <h3 style={cardTitleStyle}>Claims Overview</h3>
+                  <p style={cardSubtitleStyle}>Volume of claims processed</p>
+                </div>
+                <DropdownSelector value="Last month" />
+              </div>
+
+              <div style={{ width: "100%", height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={CLAIMS_OVERVIEW_DATA} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="gradClaims" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={T.blue} stopOpacity={0.2} />
+                        <stop offset="95%" stopColor={T.blue} stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={T.border} vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: T.muted, fontFamily: T.font }}
+                      tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+                      domain={[0, 15000]}
+                    />
+                    <Tooltip content={<SingleLineTooltip />} />
+                    <Area
+                      type="monotone"
+                      dataKey="claims"
+                      name="Claims"
+                      stroke={T.blue}
+                      strokeWidth={2}
+                      fill="url(#gradClaims)"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 2, fill: T.card }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {/* ─── 5. RECENT ACTIVITY TABLE ─────────────────────────────── */}
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <div>
+                <h3 style={cardTitleStyle}>Recent Activity</h3>
+                <p style={cardSubtitleStyle}>Latest benefit claims and approvals</p>
+              </div>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "transparent",
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 8,
+                  padding: "6px 14px",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: T.muted,
+                  fontFamily: T.font,
+                  cursor: refreshing ? "default" : "pointer",
+                  opacity: refreshing ? 0.6 : 1,
+                  transition: "background 150ms, border-color 150ms",
+                }}
+                onMouseEnter={(e) => {
+                  if (!refreshing) {
+                    e.currentTarget.style.background = T.bg;
+                    e.currentTarget.style.borderColor = T.mutedLight;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.borderColor = T.border;
+                }}
+              >
+                <RefreshCw
+                  size={13}
+                  style={{ animation: refreshing ? "spin 1s linear infinite" : "none" }}
+                />
+                Refresh
+              </button>
+            </div>
+
+            {filteredActivity.length === 0 ? (
+              /* Empty state */
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "48px 16px",
+                  color: T.muted,
+                  textAlign: "center",
+                }}
+              >
+                <FileText size={32} style={{ color: T.border, marginBottom: 12 }} />
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>
+                  No recent activity
+                </p>
+                <p style={{ margin: "4px 0 0", fontSize: 12 }}>
+                  Approval actions will appear here
+                </p>
+              </div>
+            ) : (
+              /* Table */
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 13,
+                    fontFamily: T.font,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      {["Employee", "Benefit Type", "Amount", "Status", "Date"].map((col) => (
+                        <th
+                          key={col}
+                          style={{
+                            textAlign: "left",
+                            padding: "10px 12px",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: T.muted,
+                            borderBottom: `1px solid ${T.border}`,
+                            letterSpacing: "0.02em",
+                            textTransform: "uppercase",
+                            whiteSpace: "nowrap",
+                            cursor: "pointer",
+                            userSelect: "none",
+                          }}
+                        >
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredActivity.map((item, idx) => {
+                      const isApproved = item.action === "approved" || item.status === "approved";
+                      const isRejected = item.action === "rejected" || item.status === "rejected";
+                      const isPending = !isApproved && !isRejected;
+                      const statusLabel = isApproved ? "Approved" : isRejected ? "Rejected" : "Pending";
+                      const statusColor = isApproved ? T.green : isRejected ? T.red : T.amber;
+                      const statusBg = isApproved ? T.greenBg : isRejected ? T.redBg : T.amberBg;
+
+                      return (
+                        <tr
+                          key={item.claimId || idx}
+                          style={{
+                            transition: "background 150ms",
+                            cursor: "default",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          {/* Employee */}
+                          <td
+                            style={{
+                              padding: "12px 12px",
+                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
+                              fontWeight: 500,
+                              color: T.fg,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div
+                                style={{
+                                  width: 30,
+                                  height: 30,
+                                  borderRadius: "50%",
+                                  background: item.avatarColor || T.blue,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "#fff",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  flexShrink: 0,
+                                  letterSpacing: "0.5px",
+                                }}
+                              >
+                                {item.initials || (item.employeeName || "").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                              </div>
+                              <span>{item.employeeName}</span>
+                            </div>
+                          </td>
+
+                          {/* Benefit Type */}
+                          <td
+                            style={{
+                              padding: "12px 12px",
+                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
+                              color: T.muted,
+                            }}
+                          >
+                            {item.type || item.category || "--"}
+                          </td>
+
+                          {/* Amount */}
+                          <td
+                            style={{
+                              padding: "12px 12px",
+                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
+                              fontWeight: 600,
+                              fontVariantNumeric: "tabular-nums",
+                              color: T.fg,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.amount || "--"}
+                          </td>
+
+                          {/* Status badge */}
+                          <td
+                            style={{
+                              padding: "12px 12px",
+                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                padding: "3px 10px",
+                                borderRadius: 100,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: statusColor,
+                                background: statusBg,
+                                lineHeight: "16px",
+                              }}
+                            >
+                              {isApproved && <Check size={11} />}
+                              {isRejected && <X size={11} />}
+                              {isPending && <Clock size={11} />}
+                              {statusLabel}
+                            </span>
+                          </td>
+
+                          {/* Date */}
+                          <td
+                            style={{
+                              padding: "12px 12px",
+                              borderBottom: idx < filteredActivity.length - 1 ? `1px solid ${T.border}` : "none",
+                              color: T.muted,
+                              fontSize: 12,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.timestamp || item.dateSubmitted || "--"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+
+
+        </>
+      )}
+
+      {/* Keyframe animation for spinner */}
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   );
 }
-

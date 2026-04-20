@@ -27,45 +27,7 @@ export interface Employee {
 
 // ─── Claim ────────────────────────────────────────────────────────────────────
 
-export type ClaimStatus =
-  | "claimed"
-  | "invoice_pending"
-  | "submitted"
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "eligible"
-  | "auto_approved"
-  | "flagged_for_later";
-
-// Risk scoring used by AI-assisted review (PRD v0).
-export type RiskLevel = "normal" | "medium" | "high";
-
-// Separate lifecycle for the bill/invoice attached to a claim.
-export type BillStatus = "uploaded" | "validated" | "pending" | "mismatch" | "not_required";
-
-// When a single high-value purchase is allocated across multiple monthly cycles.
-export interface MultiMonthAllocation {
-  index: number;
-  total: number;
-  originalTransactionId: string;
-  originalDate: string;
-  originalMerchant: string;
-  originalAmount: number;
-  allocationAmount: number;
-}
-
-// Reason a claim was auto-approved — discriminated union of 3 rule types.
-export type AutoApproveRule =
-  | { type: "category"; category: AllowanceCategory }
-  | { type: "threshold"; amountLessThan: number }
-  | { type: "employee"; employeeId: string };
-
-export type RejectionReason =
-  | "not_a_business_expense"
-  | "duplicate_claim"
-  | "policy_violation"
-  | "other";
+export type ClaimStatus = "claimed" | "invoice_pending" | "submitted" | "pending" | "approved" | "rejected";
 
 export interface Claim {
   id: string;
@@ -89,57 +51,6 @@ export interface Claim {
   transactionId?: string;
   salaryBand?: string;
   approvalTag?: "auto" | "manual" | "escalated";
-  // ── PRD v0 additive fields (all optional) ──
-  cycleId?: string;
-  riskLevel?: RiskLevel;
-  flaggedByAI?: boolean;
-  flagReason?: string;
-  billStatus?: BillStatus;
-  multiMonthAllocation?: MultiMonthAllocation;
-  autoApproveRule?: AutoApproveRule;
-  approvalSource?: "auto" | "manual";
-  rejectionReason?: RejectionReason;
-  rejectionNote?: string;
-}
-
-// ─── Cycle (monthly submission / payroll window) ──────────────────────────────
-
-export interface Cycle {
-  id: string;
-  month: number; // 1-12
-  year: number;
-  label: string; // e.g. "April 2026"
-  submissionCutoff: string; // ISO timestamp
-  payrollCutoff: string; // ISO timestamp
-  status: "active" | "closed";
-}
-
-// ─── Disputes ─────────────────────────────────────────────────────────────────
-
-export type DisputeType = "wrong_category" | "wrong_rejection" | "missed_transaction" | "other";
-export type DisputeStatus = "raised" | "under_review" | "resolved" | "rejected";
-
-export interface Dispute {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  initials: string;
-  avatarColor: string;
-  claimId: string;
-  claimCategory: string;
-  originalTransaction: {
-    date: string;
-    merchant: string;
-    amount: number;
-  };
-  disputeType: DisputeType;
-  status: DisputeStatus;
-  resolutionDetails?: {
-    action: string;
-    by: string;
-    at: string;
-  };
-  raisedAt: string;
 }
 
 // ─── Policy ───────────────────────────────────────────────────────────────────

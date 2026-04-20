@@ -1,726 +1,502 @@
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-  type CSSProperties,
-} from "react";
-import { Save, Loader2, Info, Lock, Eye, EyeOff, X } from "lucide-react";
+import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
+import {
+  User, Palette, Bell, GitBranch, Shield, Database, Save,
+ToggleLeft, ToggleRight, Loader2, RotateCcw, Mail, LogOut
+} from "lucide-react";
 import { toast } from "sonner";
-import { useUserProfile } from "@partner-portal/shared/contexts/UserProfileContext";
-
-/* ─── Style helpers ────────────────────────────────────────────────────── */
+import * as api from "@partner-portal/shared/api";
+import { useUserProfile, AVATAR_COLORS } from "@partner-portal/shared/contexts/UserProfileContext";
+import { getInitials } from "@partner-portal/shared/helpers";
+import { type DashboardCards, DEFAULT_PROFILE } from "@partner-portal/shared";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
 const btnPrimary: CSSProperties = {
-  ...font,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  padding: "var(--space-2) var(--space-4)",
-  backgroundColor: "var(--brand-accent)",
-  color: "#fff",
-  border: "none",
-  borderRadius: "var(--rounded-md)",
-  fontSize: "var(--text-sm)",
-  fontWeight: 500,
-  cursor: "pointer",
-  transition: "background-color 150ms ease, opacity 150ms ease",
-};
-
-const btnSecondary: CSSProperties = {
-  ...font,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  padding: "var(--space-2) var(--space-4)",
-  backgroundColor: "transparent",
-  color: "var(--color-foreground)",
-  border: "1px solid var(--color-border)",
-  borderRadius: "var(--rounded-md)",
-  fontSize: "var(--text-sm)",
-  fontWeight: 500,
-  cursor: "pointer",
-  transition: "background-color 150ms ease, border-color 150ms ease",
+  ...font, display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
+  padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-accent)",
+  color: "#fff", border: "none", borderRadius: "var(--rounded-md)",
+  fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer",
 };
 
 const inputStyle: CSSProperties = {
-  ...font,
-  width: "100%",
-  padding: "10px 12px",
-  border: "1px solid var(--color-border)",
-  borderRadius: "var(--rounded-md)",
-  fontSize: "var(--text-sm)",
-  backgroundColor: "var(--color-background)",
-  color: "var(--color-foreground)",
-  outline: "none",
-  transition: "border-color 150ms ease, box-shadow 150ms ease",
-};
-
-const labelStyle: CSSProperties = {
-  display: "block",
-  fontSize: "var(--text-xs)",
-  fontWeight: 600,
-  color: "var(--color-muted-foreground)",
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  marginBottom: "var(--space-1)",
+  ...font, width: "100%", padding: "var(--space-2) var(--space-3)",
+  border: "1px solid var(--color-border)", borderRadius: "var(--rounded-md)",
+  fontSize: "var(--text-sm)", backgroundColor: "var(--color-background)",
+  color: "var(--color-foreground)", outline: "none",
 };
 
 const sectionCard: CSSProperties = {
-  backgroundColor: "var(--color-card)",
-  border: "1px solid var(--color-border)",
-  borderRadius: "var(--rounded-lg)",
-  padding: "var(--space-6)",
+  backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)",
+  borderRadius: "var(--rounded-lg)", padding: "var(--space-6)",
+  transition: "box-shadow 200ms ease-out",
 };
 
-/* ─── Validation helpers ───────────────────────────────────────────────── */
+const TABS = [
+  { id: "profile", label: "Profile", icon: User },
+  { id: "workflow", label: "Workflow", icon: GitBranch },
+] as const;
+
+type TabId = typeof TABS[number]["id"];
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DIGEST_OPTIONS = ["realtime", "daily", "weekly", "never"] as const;
 
 function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
-
-// Loose Indian phone validation — +91 XXXXX XXXXX or a 10-digit number.
-function isValidIndianPhone(raw: string): boolean {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 10) return true;
-  if (digits.length === 12 && digits.startsWith("91")) return true;
-  return false;
-}
-
-function formatIndianPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 12);
-  let rest = digits;
-  let cc = "";
-  if (digits.startsWith("91") && digits.length > 10) {
-    cc = "+91 ";
-    rest = digits.slice(2);
-  }
-  rest = rest.slice(0, 10);
-  if (rest.length <= 5) return cc + rest;
-  return `${cc}${rest.slice(0, 5)} ${rest.slice(5)}`.trim();
-}
-
-/* ─── Change Password Dialog ───────────────────────────────────────────── */
-
-function ChangePasswordDialog({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNext, setShowNext] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  // Reset fields when dialog closes.
-  useEffect(() => {
-    if (!open) {
-      setCurrent("");
-      setNext("");
-      setConfirm("");
-      setShowCurrent(false);
-      setShowNext(false);
-      setShowConfirm(false);
-    }
-  }, [open]);
-
-  // Close on Escape key.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  const canSubmit =
-    current.length > 0 &&
-    next.length >= 8 &&
-    confirm.length > 0 &&
-    next === confirm &&
-    !submitting;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit) return;
-    if (next !== confirm) {
-      toast.error("New passwords do not match");
-      return;
-    }
-    if (next.length < 8) {
-      toast.error("Password must be at least 8 characters");
-      return;
-    }
-    setSubmitting(true);
-    // Mock network latency.
-    await new Promise((r) => setTimeout(r, 500));
-    setSubmitting(false);
-    toast.success("Password updated");
-    onClose();
-  };
-
-  const renderPasswordField = (
-    id: string,
-    label: string,
-    value: string,
-    setValue: (v: string) => void,
-    show: boolean,
-    setShow: (v: boolean) => void,
-    help?: string,
-  ) => (
-    <div style={{ marginBottom: "var(--space-4)" }}>
-      <label htmlFor={id} style={labelStyle}>
-        {label}
-      </label>
-      <div style={{ position: "relative" }}>
-        <input
-          id={id}
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          style={{ ...inputStyle, paddingRight: 40 }}
-          autoComplete="new-password"
-        />
-        <button
-          type="button"
-          onClick={() => setShow(!show)}
-          aria-label={show ? "Hide password" : "Show password"}
-          style={{
-            position: "absolute",
-            right: 8,
-            top: "50%",
-            transform: "translateY(-50%)",
-            background: "none",
-            border: "none",
-            padding: 4,
-            cursor: "pointer",
-            color: "var(--color-muted-foreground)",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {show ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-      </div>
-      {help && (
-        <p
-          style={{
-            margin: "var(--space-1) 0 0",
-            fontSize: "var(--text-xs)",
-            color: "var(--color-muted-foreground)",
-          }}
-        >
-          {help}
-        </p>
-      )}
-    </div>
-  );
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="change-password-title"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.45)",
-        zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "var(--space-4)",
-      }}
-    >
-      <div
-        ref={dialogRef}
-        style={{
-          ...font,
-          backgroundColor: "var(--color-card)",
-          borderRadius: "var(--rounded-lg)",
-          boxShadow: "var(--elevation-xl)",
-          width: "100%",
-          maxWidth: 440,
-          padding: "var(--space-6)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "var(--space-5)",
-          }}
-        >
-          <h2
-            id="change-password-title"
-            style={{
-              margin: 0,
-              fontSize: "var(--text-lg)",
-              fontWeight: 600,
-              color: "var(--color-foreground)",
-            }}
-          >
-            Change Password
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "var(--color-muted-foreground)",
-              padding: 4,
-              display: "inline-flex",
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          {renderPasswordField(
-            "cp-current",
-            "Current Password",
-            current,
-            setCurrent,
-            showCurrent,
-            setShowCurrent,
-          )}
-          {renderPasswordField(
-            "cp-new",
-            "New Password",
-            next,
-            setNext,
-            showNext,
-            setShowNext,
-            "At least 8 characters.",
-          )}
-          {renderPasswordField(
-            "cp-confirm",
-            "Confirm New Password",
-            confirm,
-            setConfirm,
-            showConfirm,
-            setShowConfirm,
-            confirm.length > 0 && confirm !== next
-              ? "Passwords do not match."
-              : undefined,
-          )}
-
-          <div
-            style={{
-              display: "flex",
-              gap: "var(--space-2)",
-              justifyContent: "flex-end",
-              marginTop: "var(--space-5)",
-            }}
-          >
-            <button type="button" style={btnSecondary} onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              style={{
-                ...btnPrimary,
-                opacity: canSubmit ? 1 : 0.5,
-                cursor: canSubmit ? "pointer" : "not-allowed",
-              }}
-              disabled={!canSubmit}
-            >
-              {submitting ? (
-                <>
-                  <Loader2
-                    size={14}
-                    style={{ animation: "spin 1s linear infinite" }}
-                  />
-                  Updating...
-                </>
-              ) : (
-                <>
-                  <Lock size={14} /> Update Password
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Email info tooltip ───────────────────────────────────────────────── */
-
-function EmailInfoTooltip() {
-  const [show, setShow] = useState(false);
-  return (
-    <span
-      style={{ position: "relative", display: "inline-flex" }}
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
-      onFocus={() => setShow(true)}
-      onBlur={() => setShow(false)}
-    >
-      <button
-        type="button"
-        aria-label="Email change info"
-        style={{
-          background: "none",
-          border: "none",
-          padding: 0,
-          marginLeft: 4,
-          cursor: "help",
-          display: "inline-flex",
-          color: "var(--color-muted-foreground)",
-        }}
-      >
-        <Info size={13} />
-      </button>
-      {show && (
-        <span
-          role="tooltip"
-          style={{
-            ...font,
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            left: "50%",
-            transform: "translateX(-50%)",
-            backgroundColor: "var(--brand-navy)",
-            color: "#fff",
-            fontSize: "var(--text-xs)",
-            padding: "6px 10px",
-            borderRadius: "var(--rounded-md)",
-            width: 240,
-            lineHeight: 1.45,
-            zIndex: 10,
-            boxShadow: "var(--elevation-md)",
-            textTransform: "none",
-            letterSpacing: "normal",
-            fontWeight: 400,
-          }}
-        >
-          This email is your login ID. Changing it will require you to re-login
-          with the new address.
-        </span>
-      )}
-    </span>
-  );
-}
-
-/* ─── Settings Component ───────────────────────────────────────────────── */
 
 export function Settings() {
-  const { profile, updateProfile, saveProfile, saving } = useUserProfile();
+  const { profile, updateProfile, saveProfile, saving: profileSaving } = useUserProfile();
 
-  // Locally editable fields. Phone is app-local (not in shared profile schema).
-  const [name, setName] = useState(profile.name ?? "");
-  const [email, setEmail] = useState(profile.email ?? "");
-  const [phone, setPhone] = useState("+91 98765 43210");
+  const [activeTab, setActiveTab] = useState<TabId>("profile");
+  const [saving, setSaving] = useState(false);
 
-  // Snapshot for dirty tracking — captured once on mount + when profile loads.
-  const initialRef = useRef<{ name: string; email: string; phone: string }>({
-    name: profile.name ?? "",
-    email: profile.email ?? "",
-    phone: "+91 98765 43210",
+  // Track unsaved changes per tab
+  const [dirtyTabs, setDirtyTabs] = useState<Set<TabId>>(new Set());
+
+  // Snapshot of original profile for dirty tracking
+  const profileSnapshotRef = useRef<string>("");
+  const settingsSnapshotRef = useRef<string>("");
+
+  // Preview avatar color (only applied on save)
+  const [previewAvatarColor, setPreviewAvatarColor] = useState<string>(profile.avatarColor);
+
+  // Local settings state (for workflow/security/notifications/data tabs)
+  const [settings, setSettings] = useState({
+    // Notifications
+    emailEnabled: true,
+    slackEnabled: false,
+    digestFrequency: "daily" as string,
+    notifyOnClaim: true,
+    notifyOnApproval: true,
+    notifyOnNewEmployee: true,
+    notifyOnPolicyChange: false,
+    // Workflow
+    autoApproveEnabled: true,
+    autoApproveThreshold: 2000,
+    escalationHours: 48,
+    // Security
+    twoFactorEnabled: false,
+    sessionTimeout: 30,
+    // Data
+    exportFormat: profile.exportFormat || "pdf",
+    dataRetention: profile.dataRetention || "2years",
   });
 
-  // If profile loads async, sync state once when it arrives.
-  const hydratedRef = useRef(false);
   useEffect(() => {
-    if (!hydratedRef.current && (profile.name || profile.email)) {
-      hydratedRef.current = true;
-      setName(profile.name ?? "");
-      setEmail(profile.email ?? "");
-      initialRef.current = {
-        name: profile.name ?? "",
-        email: profile.email ?? "",
-        phone: initialRef.current.phone,
-      };
+    (async () => {
+      try {
+        const res = await api.getSettings();
+        if (res.data) {
+          setSettings(prev => {
+            const merged = { ...prev, ...res.data };
+            settingsSnapshotRef.current = JSON.stringify(merged);
+            return merged;
+          });
+        }
+      } catch { /* use defaults */ }
+    })();
+  }, []);
+
+  // Update snapshot when profile loads
+  useEffect(() => {
+    profileSnapshotRef.current = JSON.stringify({
+      name: profile.name, designation: profile.designation,
+      email: profile.email, employeeId: profile.employeeId,
+      avatarColor: profile.avatarColor,
+    });
+    setPreviewAvatarColor(profile.avatarColor);
+  }, []);
+
+  // Mark tab dirty on profile field changes
+  const markDirty = (tab: TabId) => {
+    setDirtyTabs(prev => {
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
+  };
+
+  const clearDirty = (tab: TabId) => {
+    setDirtyTabs(prev => {
+      const next = new Set(prev);
+      next.delete(tab);
+      return next;
+    });
+  };
+
+  const handleSaveSection = useCallback(async () => {
+    setSaving(true);
+    try {
+      if (activeTab === "profile") {
+        // Validate email
+        if (!isValidEmail(profile.email)) {
+          toast.error("Please enter a valid email address");
+          setSaving(false);
+          return;
+        }
+        // Apply preview avatar color to profile before saving
+        updateProfile({ avatarColor: previewAvatarColor });
+        await saveProfile({ avatarColor: previewAvatarColor });
+        toast.success("Profile updated");
+      } else {
+        await api.saveSettings(settings);
+        toast.success("Settings saved");
+      }
+      clearDirty(activeTab);
+    } catch (e: any) {
+      toast.error("Failed to save");
+    } finally {
+      setSaving(false);
     }
-  }, [profile.name, profile.email]);
+  }, [activeTab, settings, profile, saveProfile, previewAvatarColor, updateProfile]);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const handleResetToDefaults = useCallback(async () => {
+    if (!window.confirm("Reset all profile settings to their default values? This cannot be undone.")) return;
+    setSaving(true);
+    try {
+      updateProfile({
+        name: DEFAULT_PROFILE.name,
+        initials: DEFAULT_PROFILE.initials,
+        designation: DEFAULT_PROFILE.designation,
+        email: DEFAULT_PROFILE.email,
+        employeeId: DEFAULT_PROFILE.employeeId,
+        avatarColor: DEFAULT_PROFILE.avatarColor,
+        dashboardCards: DEFAULT_PROFILE.dashboardCards,
+        fiscalYearStart: DEFAULT_PROFILE.fiscalYearStart,
+        showGreeting: DEFAULT_PROFILE.showGreeting,
+        exportFormat: DEFAULT_PROFILE.exportFormat,
+        dataRetention: DEFAULT_PROFILE.dataRetention,
+      });
+      setPreviewAvatarColor(DEFAULT_PROFILE.avatarColor);
+      await saveProfile({
+        name: DEFAULT_PROFILE.name,
+        initials: DEFAULT_PROFILE.initials,
+        designation: DEFAULT_PROFILE.designation,
+        email: DEFAULT_PROFILE.email,
+        employeeId: DEFAULT_PROFILE.employeeId,
+        avatarColor: DEFAULT_PROFILE.avatarColor,
+        dashboardCards: DEFAULT_PROFILE.dashboardCards,
+        fiscalYearStart: DEFAULT_PROFILE.fiscalYearStart,
+        showGreeting: DEFAULT_PROFILE.showGreeting,
+        exportFormat: DEFAULT_PROFILE.exportFormat,
+        dataRetention: DEFAULT_PROFILE.dataRetention,
+      });
+      setSettings(prev => ({
+        ...prev,
+        exportFormat: DEFAULT_PROFILE.exportFormat || "pdf",
+        dataRetention: DEFAULT_PROFILE.dataRetention || "2years",
+      }));
+      setDirtyTabs(new Set());
+      toast.success("Settings reset to defaults");
+    } catch {
+      toast.error("Failed to reset settings");
+    } finally {
+      setSaving(false);
+    }
+  }, [updateProfile, saveProfile]);
 
-  const isDirty = useMemo(
-    () =>
-      name !== initialRef.current.name ||
-      email !== initialRef.current.email ||
-      phone !== initialRef.current.phone,
-    [name, email, phone],
+  const updateSetting = (key: string, value: any) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+    markDirty("workflow");
+  };
+
+  const renderToggle = (value: boolean, onChange: () => void) => (
+    <button
+      style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+      onClick={onChange}
+      tabIndex={0}
+      role="switch"
+      aria-checked={value}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onChange();
+        }
+      }}
+    >
+      {value
+        ? <ToggleRight size={24} style={{ color: "var(--brand-green)" }} />
+        : <ToggleLeft size={24} style={{ color: "var(--color-muted-foreground)" }} />}
+    </button>
   );
 
-  const handleSave = async () => {
-    if (!name.trim()) {
-      toast.error("Name cannot be empty");
-      return;
-    }
-    if (!isValidEmail(email)) {
-      toast.error("Please enter a valid email address");
-      return;
-    }
-    if (!isValidIndianPhone(phone)) {
-      toast.error("Please enter a valid Indian phone number");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      // Persist name/email through shared context (mocked via shared api).
-      updateProfile({ name, email });
-      try {
-        await saveProfile({ name, email });
-      } catch {
-        // Shared api may 404 in v0 — ignore, we still treat this as success.
-      }
-      // Phone is stored locally only for v0.
-      initialRef.current = { name, email, phone };
-      toast.success("Settings saved");
-    } finally {
-      setSubmitting(false);
+  const renderField = (label: string, children: React.ReactNode) => (
+    <div style={{ marginBottom: "var(--space-4)" }}>
+      <label style={{
+        display: "block", fontSize: "var(--text-xs)", fontWeight: 600,
+        color: "var(--color-muted-foreground)", textTransform: "uppercase",
+        letterSpacing: "0.04em", marginBottom: "var(--space-1)",
+      }}>
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+
+  const renderToggleRow = (label: string, description: string, value: boolean, onChange: () => void) => (
+    <div style={{
+      display: "flex", justifyContent: "space-between", alignItems: "center",
+      padding: "var(--space-3) 0", borderBottom: "1px solid var(--color-border)",
+    }}>
+      <div>
+        <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)" }}>{label}</p>
+        <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>{description}</p>
+      </div>
+      {renderToggle(value, onChange)}
+    </div>
+  );
+
+  const renderSaveButton = () => (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      marginTop: "var(--space-6)", paddingTop: "var(--space-4)",
+      borderTop: "1px solid var(--color-border)",
+    }}>
+      <button style={{
+        ...btnPrimary,
+        opacity: saving || profileSaving ? 0.7 : 1,
+      }} onClick={handleSaveSection}
+        disabled={saving || profileSaving}
+        onMouseEnter={e => { if (!saving && !profileSaving) e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)"; }}
+        onMouseLeave={e => e.currentTarget.style.backgroundColor = "var(--brand-accent)"}>
+        {saving || profileSaving ? (
+          <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Saving...</>
+        ) : (
+          <><Save size={14} /> Save Changes</>
+        )}
+      </button>
+      <button style={{
+        ...font, display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
+        padding: "var(--space-2) var(--space-4)", backgroundColor: "transparent",
+        color: "var(--color-muted-foreground)", border: "1px solid var(--color-border)",
+        borderRadius: "var(--rounded-md)", fontSize: "var(--text-sm)",
+        fontWeight: 500, cursor: "pointer",
+      }}
+        onClick={handleResetToDefaults}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = "#EF4444"; e.currentTarget.style.color = "#EF4444"; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.color = "var(--color-muted-foreground)"; }}>
+        <RotateCcw size={14} /> Reset to Defaults
+      </button>
+    </div>
+  );
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "profile":
+        return (
+          <div>
+            <h3 style={{ margin: "0 0 var(--space-5)", fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
+              Profile
+            </h3>
+
+            {/* Avatar + Info */}
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", marginBottom: "var(--space-6)" }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: "var(--rounded-full)",
+                backgroundColor: profile.avatarColor, color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "var(--text-xl)", fontWeight: 700,
+              }}>
+                {profile.initials}
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: "var(--text-base)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                  {profile.name}
+                </p>
+                <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
+                  {profile.email}
+                </p>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "0 0 var(--space-5)" }} />
+
+            {/* Logout */}
+            <button
+              style={{
+                ...btnPrimary,
+                backgroundColor: "#EF4444",
+              }}
+              onClick={() => {
+                if (window.confirm("Are you sure you want to logout?")) {
+                  window.location.href = "/";
+                }
+              }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#DC2626")}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#EF4444")}
+            >
+              <LogOut size={14} /> Logout
+            </button>
+          </div>
+        );
+
+      case "workflow":
+        return (
+          <div>
+            <h3 style={{ margin: "0 0 var(--space-5)", fontSize: "var(--text-lg)", fontWeight: 600, color: "var(--color-foreground)" }}>
+              Workflow Settings
+            </h3>
+
+            <div style={{
+              padding: "var(--space-4)", backgroundColor: "var(--color-background)",
+              borderRadius: "var(--rounded-md)", border: "1px solid var(--color-border)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-3)" }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: "50%",
+                  backgroundColor: "var(--brand-green)",
+                }} />
+                <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                  Auto-Approve is ON
+                </span>
+              </div>
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "var(--space-3)", backgroundColor: "var(--color-card)",
+                borderRadius: "var(--rounded-md)", border: "1px solid var(--color-border)",
+              }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)" }}>
+                    Auto-Approve Limit
+                  </p>
+                  <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                    Claims below this amount are automatically approved
+                  </p>
+                </div>
+                <span style={{
+                  fontSize: "var(--text-base)", fontWeight: 700, color: "var(--brand-green)",
+                  backgroundColor: "#D1FAE5", padding: "var(--space-1) var(--space-3)",
+                  borderRadius: "var(--rounded-md)", border: "1px solid #6EE7B7",
+                }}>
+                  ₹{settings.autoApproveThreshold.toLocaleString("en-IN")}
+                </span>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "var(--space-4) 0" }} />
+
+            {renderField("Escalation Timer (Hours)",
+              <div>
+                <input type="number" style={inputStyle} value={settings.escalationHours}
+                  onChange={e => updateSetting("escalationHours", Number(e.target.value))} />
+                <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+                  Pending claims older than this are escalated to senior admins.
+                </p>
+              </div>
+            )}
+
+            {renderSaveButton()}
+
+            {/* Contact Us Card */}
+            <div
+              style={{
+                padding: "var(--space-5)",
+                marginTop: "var(--space-5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "var(--space-4)",
+                background: "linear-gradient(135deg, var(--brand-accent-alpha-8) 0%, var(--color-card) 100%)",
+                borderRadius: "var(--rounded-lg)",
+                border: "1px solid var(--color-border)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: "var(--rounded-full)",
+                  backgroundColor: "var(--brand-accent-alpha-8)", display: "flex",
+                  alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}>
+                  <Shield size={22} style={{ color: "var(--brand-navy)" }} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "var(--text-base)", fontWeight: 600, color: "var(--color-foreground)" }}>
+                    Want to make changes to your policy?
+                  </h3>
+                  <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
+                    Contact the Salaryse team to update brackets, add new bands, or modify limits.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="mailto:support@salaryse.com?subject=Policy%20configuration%20change%20request"
+                style={{ ...btnPrimary, textDecoration: "none" }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = "var(--brand-accent-hover)")}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = "var(--brand-accent)")}
+              >
+                <Mail size={16} /> Contact Us
+              </a>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
     }
   };
 
-  const busy = submitting || saving;
-
   return (
-    <div style={{ ...font, padding: "var(--space-6)", maxWidth: 720 }}>
+    <div style={{ ...font, padding: "var(--space-6)" }}>
       {/* Spinner keyframe */}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
       {/* Header */}
       <div style={{ marginBottom: "var(--space-5)" }}>
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "var(--text-xl)",
-            fontWeight: 700,
-            color: "var(--color-foreground)",
-          }}
-        >
+        <h1 style={{ margin: 0, fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--color-foreground)" }}>
           Settings
         </h1>
-        <p
-          style={{
-            margin: "var(--space-1) 0 0",
-            fontSize: "var(--text-sm)",
-            color: "var(--color-muted-foreground)",
-          }}
-        >
-          Manage your admin account details.
+        <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)" }}>
+          Configure your SalarySe benefits portal
         </p>
       </div>
 
-      {/* Account Card */}
-      <div style={sectionCard}>
-        <h2
-          style={{
-            margin: "0 0 var(--space-5)",
-            fontSize: "var(--text-lg)",
-            fontWeight: 600,
-            color: "var(--color-foreground)",
-          }}
-        >
-          Admin Account
-        </h2>
-
-        {/* Name */}
-        <div style={{ marginBottom: "var(--space-4)" }}>
-          <label htmlFor="settings-name" style={labelStyle}>
-            Name
-          </label>
-          <input
-            id="settings-name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={inputStyle}
-            placeholder="Your full name"
-          />
+      <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "var(--space-5)" }}>
+        {/* Tab Nav */}
+        <div style={{
+          display: "flex", flexDirection: "column", gap: "var(--space-1)",
+        }}>
+          {TABS.map(tab => {
+            const isActive = activeTab === tab.id;
+            const isDirty = dirtyTabs.has(tab.id);
+            const TabIcon = tab.icon;
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+                ...font, display: "flex", alignItems: "center", gap: "var(--space-3)",
+                padding: "var(--space-3) var(--space-4)",
+                borderRadius: "var(--rounded-md)", border: "none",
+                fontSize: "var(--text-sm)", fontWeight: isActive ? 600 : 400,
+                cursor: "pointer", textAlign: "left",
+                backgroundColor: isActive ? "var(--brand-navy-alpha-08)" : "transparent",
+                color: isActive ? "var(--brand-navy)" : "var(--color-muted-foreground)",
+                transition: "all 150ms",
+                position: "relative",
+              }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.backgroundColor = "var(--color-background)"; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.backgroundColor = "transparent"; }}>
+                <TabIcon size={16} />
+                {tab.label}
+                {isDirty && (
+                  <span style={{
+                    width: 6, height: 6, borderRadius: "50%",
+                    backgroundColor: "var(--brand-accent)",
+                    marginLeft: "auto", flexShrink: 0,
+                  }} />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Email */}
-        <div style={{ marginBottom: "var(--space-4)" }}>
-          <label
-            htmlFor="settings-email"
-            style={{
-              ...labelStyle,
-              display: "inline-flex",
-              alignItems: "center",
-            }}
-          >
-            Email
-            <EmailInfoTooltip />
-          </label>
-          <input
-            id="settings-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={inputStyle}
-            placeholder="you@company.com"
-            autoComplete="email"
-          />
-          <p
-            style={{
-              margin: "var(--space-1) 0 0",
-              fontSize: "var(--text-xs)",
-              color: "var(--color-muted-foreground)",
-            }}
-          >
-            Used as your login ID.
-          </p>
-        </div>
-
-        {/* Phone */}
-        <div style={{ marginBottom: "var(--space-4)" }}>
-          <label htmlFor="settings-phone" style={labelStyle}>
-            Phone
-          </label>
-          <input
-            id="settings-phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(formatIndianPhone(e.target.value))}
-            style={inputStyle}
-            placeholder="+91 98765 43210"
-            autoComplete="tel"
-            inputMode="tel"
-          />
-          <p
-            style={{
-              margin: "var(--space-1) 0 0",
-              fontSize: "var(--text-xs)",
-              color: "var(--color-muted-foreground)",
-            }}
-          >
-            Indian format, e.g. +91 98765 43210.
-          </p>
-        </div>
-
-        {/* Password */}
-        <div style={{ marginBottom: "var(--space-2)" }}>
-          <label style={labelStyle}>Password</label>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "var(--space-3)",
-              padding: "10px 12px",
-              border: "1px solid var(--color-border)",
-              borderRadius: "var(--rounded-md)",
-              backgroundColor: "var(--color-background)",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "var(--text-sm)",
-                color: "var(--color-muted-foreground)",
-                letterSpacing: "0.15em",
-              }}
-            >
-              ••••••••••
-            </span>
-            <button
-              type="button"
-              style={btnSecondary}
-              onClick={() => setDialogOpen(true)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "var(--color-background)";
-                e.currentTarget.style.borderColor = "var(--brand-accent)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.borderColor = "var(--color-border)";
-              }}
-            >
-              <Lock size={14} /> Change Password
-            </button>
-          </div>
-        </div>
-
-        {/* Save Row */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            marginTop: "var(--space-6)",
-            paddingTop: "var(--space-4)",
-            borderTop: "1px solid var(--color-border)",
-            gap: "var(--space-2)",
-          }}
-        >
-          {isDirty && (
-            <span
-              style={{
-                fontSize: "var(--text-xs)",
-                color: "var(--color-muted-foreground)",
-                marginRight: "auto",
-              }}
-            >
-              You have unsaved changes.
-            </span>
-          )}
-          <button
-            type="button"
-            style={{
-              ...btnPrimary,
-              opacity: !isDirty || busy ? 0.5 : 1,
-              cursor: !isDirty || busy ? "not-allowed" : "pointer",
-            }}
-            disabled={!isDirty || busy}
-            onClick={handleSave}
-            onMouseEnter={(e) => {
-              if (isDirty && !busy)
-                e.currentTarget.style.backgroundColor =
-                  "var(--brand-accent-hover)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--brand-accent)";
-            }}
-          >
-            {busy ? (
-              <>
-                <Loader2
-                  size={14}
-                  style={{ animation: "spin 1s linear infinite" }}
-                />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save size={14} /> Save Changes
-              </>
-            )}
-          </button>
+        {/* Tab Content */}
+        <div style={sectionCard}>
+          {renderTabContent()}
         </div>
       </div>
-
-      <ChangePasswordDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-      />
     </div>
   );
 }
