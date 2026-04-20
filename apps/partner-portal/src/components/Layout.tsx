@@ -9,7 +9,6 @@ import {
   ClipboardCheck,
   Download,
   Users,
-  Bell,
   ChevronRight,
   HelpCircle,
   Home,
@@ -21,7 +20,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { UserProfileProvider, useUserProfile } from "@partner-portal/shared/contexts/UserProfileContext";
-import { NotificationDrawer } from "./NotificationDrawer";
 import { useIsMobile } from "@partner-portal/shared/hooks/useIsMobile";
 
 // ─── Nav Items ──────────────────────────────────────────────────────────────
@@ -31,7 +29,6 @@ const MAIN_NAV_ITEMS = [
     path: "/",
     label: "Dashboard",
     icon: LayoutDashboard,
-    badge: "9",
     iconBg: "var(--icon-dashboard-bg)",
     iconFg: "var(--icon-dashboard-fg)",
   },
@@ -208,8 +205,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   // Close mobile sidebar on route change
@@ -222,12 +217,8 @@ function LayoutInner({ children }: { children: ReactNode }) {
     try { localStorage.removeItem("userProfile"); } catch { /* noop */ }
     setProfileMenuOpen(false);
     toast.success("Logged out");
-    router.push("/");
+    router.push("/login");
   }, [router]);
-
-  const handleUnreadCountChange = useCallback((count: number) => {
-    setUnreadCount(count);
-  }, []);
 
   const pageTitle = getPageTitle(pathname);
 
@@ -319,11 +310,46 @@ function LayoutInner({ children }: { children: ReactNode }) {
 
           <SidebarNavItem
             path="/help"
-            label="Help center"
+            label="Help Center"
             icon={HelpCircle}
             iconBg="var(--icon-help-bg)"
             iconFg="var(--icon-help-fg)"
           />
+
+          {/* PRD §3: Logout (bottom of sidebar) */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 transition-colors duration-150"
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              fontSize: "var(--text-sm)",
+              fontWeight: 400,
+              color: "var(--sidebar-text-muted)",
+              backgroundColor: "transparent",
+              border: "none",
+              marginTop: 2,
+              cursor: "pointer",
+              width: "100%",
+              textAlign: "left",
+              fontFamily: "'IBM Plex Sans', sans-serif",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+          >
+            <div
+              className="flex items-center justify-center shrink-0"
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
+                backgroundColor: "var(--color-surface)",
+              }}
+            >
+              <LogOut size={14} style={{ color: "var(--brand-red)" }} />
+            </div>
+            <span className="flex-1">Logout</span>
+          </button>
         </nav>
 
         {/* ── Profile Footer ──────────────────────────────────────────── */}
@@ -421,35 +447,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setDrawerOpen(true)}
-              aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
-              className="flex items-center justify-center transition-colors duration-150"
-              style={{
-                width: 34, height: 34, borderRadius: 8,
-                border: "1px solid var(--color-border)", background: "none",
-                cursor: "pointer", color: "var(--sidebar-text-muted)", position: "relative",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--sidebar-hover-bg)")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-            >
-              <Bell size={16} />
-              {unreadCount > 0 && (
-                <span
-                  className="flex items-center justify-center"
-                  style={{
-                    position: "absolute", top: 3, right: 3, minWidth: 16, height: 16,
-                    padding: "0 4px", borderRadius: "var(--rounded-full)",
-                    backgroundColor: "var(--brand-accent)", color: "#fff",
-                    fontSize: 10, fontWeight: 600, lineHeight: 1,
-                  }}
-                >
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
-            </button>
-          </div>
+          {/* PRD §7: no real-time features in v0 — notification bell removed. */}
         </header>
 
         {/* ── Content Area ────────────────────────────────────────────── */}
@@ -467,13 +465,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
           </Suspense>
         </main>
       </div>
-
-      {/* Notification Drawer */}
-      <NotificationDrawer
-        isOpen={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onUnreadCountChange={handleUnreadCountChange}
-      />
     </div>
   );
 }

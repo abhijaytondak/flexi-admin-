@@ -31,3 +31,9 @@ dist-ssr
 *.sw?
 tmp/
 .vercel
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Claude Code worktree metadata
+.claude/
