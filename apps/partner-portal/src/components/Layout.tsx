@@ -387,7 +387,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
       </aside>
 
       {/* ─── Main Area ───────────────────────────────────────────────── */}
-      <div className="flex flex-col flex-1" style={{ marginLeft: isMobile ? 0 : 260 }}>
+      <div className="flex flex-col flex-1 min-w-0" style={{ marginLeft: isMobile ? 0 : 260 }}>
         {/* ── Top Bar ─────────────────────────────────────────────────── */}
         <header
           className="flex items-center justify-between shrink-0"
