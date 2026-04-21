@@ -20,6 +20,7 @@ interface ClaimRowProps {
   onApprove?: (claim: Claim) => void;
   onReject?: (claim: Claim) => void;
   onFlagForLater?: (claim: Claim) => void;
+  onOpenDetails?: (claim: Claim) => void;
 }
 
 const cardStyle: CSSProperties = {
@@ -53,6 +54,7 @@ export function ClaimRow({
   onApprove,
   onReject,
   onFlagForLater,
+  onOpenDetails,
 }: ClaimRowProps) {
   const amt = parseINR(claim.claimAmount);
   const canAct =
@@ -64,8 +66,29 @@ export function ClaimRow({
       claim.status === "eligible" ||
       claim.status === "flagged_for_later");
 
+  const rowStyle: CSSProperties = onOpenDetails
+    ? { ...cardStyle, cursor: "pointer", transition: "border-color 120ms ease, background-color 120ms ease" }
+    : cardStyle;
+
   return (
-    <div style={cardStyle}>
+    <div
+      style={rowStyle}
+      onClick={onOpenDetails ? () => onOpenDetails(claim) : undefined}
+      onMouseEnter={
+        onOpenDetails
+          ? (e) => {
+              e.currentTarget.style.borderColor = "var(--brand-accent)";
+            }
+          : undefined
+      }
+      onMouseLeave={
+        onOpenDetails
+          ? (e) => {
+              e.currentTarget.style.borderColor = "var(--color-border)";
+            }
+          : undefined
+      }
+    >
       {/* Top: employee + meta */}
       <div
         style={{
@@ -195,7 +218,7 @@ export function ClaimRow({
         <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "flex-end" }}>
           {onFlagForLater && claim.status !== "flagged_for_later" && (
             <button
-              onClick={() => onFlagForLater(claim)}
+              onClick={(e) => { e.stopPropagation(); onFlagForLater(claim); }}
               style={{
                 ...btnBase,
                 backgroundColor: "transparent",
@@ -208,7 +231,7 @@ export function ClaimRow({
           )}
           {onReject && (
             <button
-              onClick={() => onReject(claim)}
+              onClick={(e) => { e.stopPropagation(); onReject(claim); }}
               style={{
                 ...btnBase,
                 backgroundColor: "transparent",
@@ -221,7 +244,7 @@ export function ClaimRow({
           )}
           {onApprove && (
             <button
-              onClick={() => onApprove(claim)}
+              onClick={(e) => { e.stopPropagation(); onApprove(claim); }}
               style={{
                 ...btnBase,
                 backgroundColor: "var(--brand-green)",

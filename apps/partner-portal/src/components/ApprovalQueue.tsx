@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, type CSSProperties } from "react";
-import { Inbox, Flag, CheckCircle, XCircle, MessageSquareWarning, Layers, X } from "lucide-react";
+import { Inbox, Flag, CheckCircle, XCircle, MessageSquareWarning, Layers, X, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@partner-portal/ui";
 import {
@@ -9,6 +9,9 @@ import {
   type ClaimStatus,
   type Dispute,
   type RejectionReason,
+  type AllowanceCategory,
+  parseINR,
+  FLEXI_BENEFIT_CATEGORIES,
   DEMO_CLAIMS,
   DEMO_CYCLES,
   DEMO_DISPUTES,
@@ -19,6 +22,7 @@ import { ClaimsList, type ViewMode } from "./approvals/ClaimsList";
 import { DisputesList } from "./approvals/DisputesList";
 import { RejectDialog } from "./approvals/RejectDialog";
 import { BulkRejectDialog } from "./approvals/BulkRejectDialog";
+import { ClaimDetailsDrawer } from "./approvals/ClaimDetailsDrawer";
 import { font } from "./approvals/constants";
 
 /**
@@ -35,6 +39,37 @@ const ACTIONABLE_STATUSES: ReadonlyArray<ClaimStatus> = [
 ];
 function isActionable(c: Claim): boolean {
   return ACTIONABLE_STATUSES.includes(c.status);
+}
+
+const inputStyle: CSSProperties = {
+  fontFamily: "'IBM Plex Sans', sans-serif",
+  width: "100%",
+  padding: "8px 10px",
+  fontSize: "var(--text-sm)",
+  border: "1px solid var(--color-border)",
+  borderRadius: "var(--rounded-md)",
+  backgroundColor: "var(--color-background)",
+  color: "var(--color-foreground)",
+  outline: "none",
+};
+
+function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: "var(--color-muted-foreground)",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+        }}
+      >
+        {label}
+      </span>
+      {children}
+    </label>
+  );
 }
 
 type ApprovalTab = "all" | "flagged" | "approved" | "rejected" | "disputes";
@@ -69,9 +104,27 @@ export function ApprovalQueue() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
 
-  // Reset selection when tab or cycle changes
+  // Claim details drawer
+  const [detailClaim, setDetailClaim] = useState<Claim | null>(null);
+
+  // Filters
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<AllowanceCategory | "all">("all");
+  const [deptFilter, setDeptFilter] = useState<string>("all");
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
+  const [minAmount, setMinAmount] = useState<string>("");
+  const [maxAmount, setMaxAmount] = useState<string>("");
+
+  // Reset selection + filters when tab or cycle changes
   useEffect(() => {
     setSelectedIds(new Set());
+    setCategoryFilter("all");
+    setDeptFilter("all");
+    setFromDate("");
+    setToDate("");
+    setMinAmount("");
+    setMaxAmount("");
   }, [activeTab, selectedCycleId]);
 
   const selectedCycle = useMemo(
@@ -118,6 +171,65 @@ export function ApprovalQueue() {
     rejected: cycleClaims.filter((c) => c.status === "rejected").length,
     disputes: cycleDisputes.length,
   };
+
+  /* ─── Filters ───────────────────────────────────────────────────────────── */
+
+  const departments = useMemo(() => {
+    const set = new Set<string>();
+    cycleClaims.forEach((c) => {
+      if (c.department) set.add(c.department);
+    });
+    return Array.from(set).sort();
+  }, [cycleClaims]);
+
+  const filtersActive =
+    categoryFilter !== "all" ||
+    deptFilter !== "all" ||
+    fromDate !== "" ||
+    toDate !== "" ||
+    minAmount !== "" ||
+    maxAmount !== "";
+
+  const filteredTabClaims = useMemo(() => {
+    if (!filtersActive) return tabClaims;
+    const minN = minAmount === "" ? -Infinity : Number(minAmount);
+    const maxN = maxAmount === "" ? Infinity : Number(maxAmount);
+    return tabClaims.filter((c) => {
+      if (categoryFilter !== "all" && c.category !== categoryFilter) return false;
+      if (deptFilter !== "all" && c.department !== deptFilter) return false;
+      if (fromDate && c.dateSubmitted < fromDate) return false;
+      if (toDate && c.dateSubmitted > toDate) return false;
+      const amt = parseINR(c.claimAmount);
+      if (amt < minN) return false;
+      if (amt > maxN) return false;
+      return true;
+    });
+  }, [tabClaims, filtersActive, categoryFilter, deptFilter, fromDate, toDate, minAmount, maxAmount]);
+
+  const clearFilters = useCallback(() => {
+    setCategoryFilter("all");
+    setDeptFilter("all");
+    setFromDate("");
+    setToDate("");
+    setMinAmount("");
+    setMaxAmount("");
+  }, []);
+
+  /* ─── Drawer handlers ───────────────────────────────────────────────────── */
+
+  const handleOpenDetails = useCallback((claim: Claim) => {
+    setDetailClaim(claim);
+  }, []);
+
+  const handleCloseDetails = useCallback(() => {
+    setDetailClaim(null);
+  }, []);
+
+  // Keep drawer in sync with claim state mutations (e.g. after Approve in drawer).
+  const liveDetailClaim = useMemo(
+    () => (detailClaim ? claims.find((c) => c.id === detailClaim.id) ?? null : null),
+    [detailClaim, claims],
+  );
 
   /* ─── Actions (mutate local state only; demo-mode) ─────────────────────── */
 
@@ -192,12 +304,28 @@ export function ApprovalQueue() {
     [claims],
   );
 
+  const handleDrawerApprove = useCallback(
+    (c: Claim) => {
+      handleApprove(c);
+      setDetailClaim(null);
+    },
+    [handleApprove],
+  );
+
+  const handleDrawerReject = useCallback(
+    (c: Claim) => {
+      setDetailClaim(null);
+      handleOpenReject(c);
+    },
+    [handleOpenReject],
+  );
+
   /* ─── Bulk selection + bulk actions ────────────────────────────────────── */
 
-  // Only actionable (non-final) claims in the current tab view are selectable.
+  // Only actionable (non-final) claims in the current (filtered) view are selectable.
   const selectableInView = useMemo(
-    () => tabClaims.filter(isActionable),
-    [tabClaims],
+    () => filteredTabClaims.filter(isActionable),
+    [filteredTabClaims],
   );
   const selectableIdsInView = useMemo(
     () => new Set(selectableInView.map((c) => c.id)),
@@ -385,6 +513,136 @@ export function ApprovalQueue() {
         })}
       </div>
 
+      {/* Filter controls — only for claim tabs, not disputes */}
+      {activeTab !== "disputes" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          {/* Row 1: category + filter toggle */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-2)",
+              flexWrap: "wrap",
+            }}
+          >
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value as AllowanceCategory | "all")}
+              aria-label="Category filter"
+              style={inputStyle}
+            >
+              <option value="all">All Categories</option>
+              {FLEXI_BENEFIT_CATEGORIES.map((cat) => (
+                <option key={cat.key} value={cat.key}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setFiltersVisible((v) => !v)}
+              aria-expanded={filtersVisible}
+              style={{
+                ...font,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 12px",
+                fontSize: "var(--text-sm)",
+                fontWeight: 500,
+                border: "1px solid var(--color-border)",
+                backgroundColor: "var(--color-background)",
+                color: "var(--color-muted-foreground)",
+                borderRadius: "var(--rounded-md)",
+                cursor: "pointer",
+              }}
+            >
+              <SlidersHorizontal size={14} />
+              {filtersVisible ? "Hide" : "Show"}
+            </button>
+            {filtersActive && (
+              <button
+                onClick={clearFilters}
+                style={{
+                  ...font,
+                  background: "none",
+                  border: "none",
+                  color: "var(--brand-accent)",
+                  fontSize: "var(--text-sm)",
+                  cursor: "pointer",
+                  padding: "8px 4px",
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {/* Row 2: advanced filters — Department / From / To / Min / Max */}
+          {filtersVisible && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: "var(--space-3)",
+                padding: "var(--space-4)",
+                backgroundColor: "var(--color-card)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--rounded-md)",
+              }}
+            >
+              <FilterField label="Department">
+                <select
+                  value={deptFilter}
+                  onChange={(e) => setDeptFilter(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="all">All Departments</option>
+                  {departments.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </FilterField>
+              <FilterField label="From Date">
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  style={inputStyle}
+                />
+              </FilterField>
+              <FilterField label="To Date">
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  style={inputStyle}
+                />
+              </FilterField>
+              <FilterField label="Min Amount">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={minAmount}
+                  onChange={(e) => setMinAmount(e.target.value)}
+                  style={inputStyle}
+                />
+              </FilterField>
+              <FilterField label="Max Amount">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="No limit"
+                  value={maxAmount}
+                  onChange={(e) => setMaxAmount(e.target.value)}
+                  style={inputStyle}
+                />
+              </FilterField>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Content */}
       {activeTab === "disputes" ? (
         cycleDisputes.length === 0 ? (
@@ -400,11 +658,11 @@ export function ApprovalQueue() {
             onRejectUnderlyingClaim={handleRejectUnderlyingClaim}
           />
         )
-      ) : tabClaims.length === 0 ? (
+      ) : filteredTabClaims.length === 0 ? (
         <EmptyState
           icon={Inbox}
-          title={EMPTY_COPY[activeTab].title}
-          description={EMPTY_COPY[activeTab].description}
+          title={filtersActive ? "No claims match your filters" : EMPTY_COPY[activeTab].title}
+          description={filtersActive ? "Try adjusting or clearing filters to see more results." : EMPTY_COPY[activeTab].description}
         />
       ) : (
         <>
@@ -490,13 +748,14 @@ export function ApprovalQueue() {
           )}
 
           <ClaimsList
-            claims={tabClaims}
+            claims={filteredTabClaims}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             readOnly={readOnly}
             onApprove={readOnly ? undefined : handleApprove}
             onReject={readOnly ? undefined : handleOpenReject}
             onFlagForLater={readOnly ? undefined : handleFlagForLater}
+            onOpenDetails={handleOpenDetails}
             selectable={!readOnly}
             selectedIds={selectedIds}
             selectableIds={selectableIdsInView}
@@ -517,6 +776,16 @@ export function ApprovalQueue() {
           onConfirm={handleConfirmReject}
         />
       )}
+
+      {/* Claim Details Drawer */}
+      <ClaimDetailsDrawer
+        claim={liveDetailClaim}
+        open={!!liveDetailClaim}
+        readOnly={readOnly}
+        onClose={handleCloseDetails}
+        onApprove={readOnly ? undefined : handleDrawerApprove}
+        onReject={readOnly ? undefined : handleDrawerReject}
+      />
 
       {/* Bulk Reject Dialog */}
       <BulkRejectDialog

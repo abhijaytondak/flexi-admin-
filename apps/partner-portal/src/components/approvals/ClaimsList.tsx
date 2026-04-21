@@ -18,6 +18,7 @@ interface ClaimsListProps {
   onApprove?: (claim: Claim) => void;
   onReject?: (claim: Claim) => void;
   onFlagForLater?: (claim: Claim) => void;
+  onOpenDetails?: (claim: Claim) => void;
   // Selection (bulk actions)
   selectable?: boolean;
   selectedIds?: Set<string>;
@@ -53,6 +54,7 @@ export function ClaimsList({
   onApprove,
   onReject,
   onFlagForLater,
+  onOpenDetails,
   selectable = false,
   selectedIds,
   selectableIds,
@@ -297,6 +299,7 @@ export function ClaimsList({
                             onApprove={onApprove}
                             onReject={onReject}
                             onFlagForLater={onFlagForLater}
+                            onOpenDetails={onOpenDetails}
                           />
                         </div>
                       </div>
@@ -317,6 +320,7 @@ export function ClaimsList({
           onApprove={onApprove}
           onReject={onReject}
           onFlagForLater={onFlagForLater}
+          onOpenDetails={onOpenDetails}
           selectable={selectable}
           isSelectable={isSelectable}
           isSelected={isSelected}
@@ -339,6 +343,7 @@ interface FlatTableProps {
   onApprove?: (claim: Claim) => void;
   onReject?: (claim: Claim) => void;
   onFlagForLater?: (claim: Claim) => void;
+  onOpenDetails?: (claim: Claim) => void;
   // Selection
   selectable?: boolean;
   isSelectable?: (id: string) => boolean;
@@ -358,6 +363,7 @@ function FlatTable({
   onApprove,
   onReject,
   onFlagForLater,
+  onOpenDetails,
   selectable = false,
   isSelectable,
   isSelected,
@@ -447,7 +453,10 @@ function FlatTable({
               <React.Fragment key={c.id}>
                 <tr
                   style={{ cursor: "pointer" }}
-                  onClick={() => setExpandedRow(isOpen ? null : c.id)}
+                  onClick={() => {
+                    if (onOpenDetails) onOpenDetails(c);
+                    else setExpandedRow(isOpen ? null : c.id);
+                  }}
                 >
                   {selectable && hasAnySelectable && (
                     <td style={{ ...tdStyle, width: 36 }} onClick={(e) => e.stopPropagation()}>
@@ -511,6 +520,7 @@ function FlatTable({
                         onApprove={onApprove}
                         onReject={onReject}
                         onFlagForLater={onFlagForLater}
+                        onOpenDetails={onOpenDetails}
                       />
                     </td>
                   </tr>
