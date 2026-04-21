@@ -311,8 +311,24 @@ ruleSeeds.forEach(({ id, rule }) => {
   }
 });
 
-// Seed multi-month allocation on 2-3 claims
+// Seed multi-month allocation on multiple claims so HR can see the
+// per-month breakdown for several real cases (annual subscriptions,
+// quarterly memberships, executive courses, etc.).
 const allocSeeds = [
+  // Sneha's Cult.fit annual membership: ₹13,500 paid up front, split into
+  // 3 monthly slices of ₹4,500 (Apr, May, Jun). Currently in slice 1 (Apr).
+  // Each slice meets-or-exceeds the ₹4,000 Health & Fitness monthly cap.
+  {
+    id: "CLM-1004",
+    originalTransactionId: "UPI-ORIG-12938475",
+    originalDate: "2026-04-01",
+    originalMerchant: "Cult.fit",
+    originalAmount: 13500,
+    allocationAmount: 4500,
+    index: 1,
+    total: 3,
+  },
+  // Vikram's Executive MBA — 2 huge slices of ₹1,20,000 each.
   {
     id: "CLM-1022",
     originalTransactionId: "UPI-ORIG-55647382",
@@ -323,6 +339,7 @@ const allocSeeds = [
     index: 2,
     total: 2,
   },
+  // Rahul's international conference flight — split into 2 slices.
   {
     id: "CLM-1021",
     originalTransactionId: "UPI-ORIG-91827364",
@@ -333,15 +350,16 @@ const allocSeeds = [
     index: 1,
     total: 2,
   },
+  // Deepika's Udemy AWS Certification — ₹25,500 over 3 months.
   {
-    id: "CLM-1023",
-    originalTransactionId: "UPI-ORIG-73625481",
-    originalDate: "2026-04-02",
-    originalMerchant: "Direct Payment",
-    originalAmount: 78500,
-    allocationAmount: 78500,
+    id: "CLM-1007",
+    originalTransactionId: "UPI-ORIG-74829103",
+    originalDate: "2026-04-05",
+    originalMerchant: "Udemy",
+    originalAmount: 25500,
+    allocationAmount: 8500,
     index: 1,
-    total: 1,
+    total: 3,
   },
 ];
 allocSeeds.forEach((s) => {

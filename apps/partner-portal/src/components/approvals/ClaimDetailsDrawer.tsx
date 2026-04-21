@@ -202,14 +202,24 @@ export function ClaimDetailsDrawer({
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  // Monthly allocation usage for this employee + category in the claim's cycle.
-  const allocation = useMemo(() => {
-    if (!claim) return null;
+  // Multi-month allocation schedule — ONLY rendered for claims where the
+  // employee paid a lumpsum upfront that consumes the monthly cap across
+  // multiple cycles (e.g. a 12-month Cult.fit membership billed Apr paid
+  // once). For regular single-month claims, this is null and the schedule
+  // section is hidden.
+  const schedule = useMemo(() => {
+    if (!claim?.multiMonthAllocation) return null;
+    if (claim.multiMonthAllocation.total <= 1) return null; // not actually multi-month
     const categoryKey = resolveCategoryKey(claim);
     if (!categoryKey) return null;
     const cap = MONTHLY_CATEGORY_CAP_INR[categoryKey];
     if (!cap) return null;
-    const cycleId = claim.cycleId;
+
+    const mm = claim.multiMonthAllocation;
+    const originalDate = new Date(mm.originalDate);
+    if (isNaN(originalDate.getTime())) return null;
+    const firstMonthStart = new Date(originalDate.getFullYear(), originalDate.getMonth(), 1);
+
     const counted: Claim["status"][] = [
       "approved",
       "auto_approved",
@@ -220,20 +230,52 @@ export function ClaimDetailsDrawer({
       "flagged_for_later",
       "eligible",
     ];
-    const previouslyUsed = allClaims
-      .filter(
-        (c) =>
-          c.id !== claim.id &&
-          c.employeeId === claim.employeeId &&
-          resolveCategoryKey(c) === categoryKey &&
-          (!cycleId || c.cycleId === cycleId) &&
-          counted.includes(c.status),
-      )
-      .reduce((sum, c) => sum + parseINR(c.claimAmount), 0);
-    const current = parseINR(claim.claimAmount);
-    const remaining = Math.max(cap - previouslyUsed - current, 0);
-    const overflow = Math.max(previouslyUsed + current - cap, 0);
-    return { cap, previouslyUsed, current, remaining, overflow };
+
+    const months = Array.from({ length: mm.total }, (_, i) => {
+      const m = new Date(firstMonthStart.getFullYear(), firstMonthStart.getMonth() + i, 1);
+      const label = m.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+      const isCurrent = i + 1 === mm.index;
+      const isPast = i + 1 < mm.index;
+
+      // Other spending this month for the same employee + category (only
+      // meaningful for the current month — past/future projections have no
+      // peer-claim data).
+      let otherThisMonth = 0;
+      if (isCurrent) {
+        otherThisMonth = allClaims
+          .filter(
+            (c) =>
+              c.id !== claim.id &&
+              c.employeeId === claim.employeeId &&
+              resolveCategoryKey(c) === categoryKey &&
+              (!claim.cycleId || c.cycleId === claim.cycleId) &&
+              counted.includes(c.status),
+          )
+          .reduce((sum, c) => sum + parseINR(c.claimAmount), 0);
+      }
+      const slice = mm.allocationAmount;
+      const totalUsed = otherThisMonth + slice;
+      const remaining = Math.max(cap - totalUsed, 0);
+      const overflow = Math.max(totalUsed - cap, 0);
+
+      return {
+        index: i + 1,
+        label,
+        isCurrent,
+        isPast,
+        slice,
+        otherThisMonth,
+        cap,
+        remaining,
+        overflow,
+      };
+    });
+
+    return {
+      mm,
+      cap,
+      months,
+    };
   }, [claim, allClaims]);
 
   if (!open || !claim) return null;
@@ -340,14 +382,11 @@ export function ClaimDetailsDrawer({
             <MetaField label="Employee ID" value={claim.employeeId || "—"} />
           </div>
 
-          {/* Monthly allocation progress */}
-          {allocation && (
-            <AllocationProgress
-              cap={allocation.cap}
-              previouslyUsed={allocation.previouslyUsed}
-              current={allocation.current}
-              remaining={allocation.remaining}
-              overflow={allocation.overflow}
+          {/* Multi-month allocation schedule — only for split transactions */}
+          {schedule && (
+            <MultiMonthSchedule
+              mm={schedule.mm}
+              months={schedule.months}
               categoryLabel={categoryLabel}
             />
           )}
@@ -504,22 +543,9 @@ export function ClaimDetailsDrawer({
             </div>
           )}
 
-          {/* Multi-month allocation note */}
-          {claim.multiMonthAllocation && (
-            <div>
-              <div style={sectionTitleStyle}>Multi-Month Allocation</div>
-              <div style={cardStyle}>
-                <div style={{ fontSize: "var(--text-sm)", color: "var(--color-foreground)", lineHeight: 1.5 }}>
-                  Allocation {claim.multiMonthAllocation.index} of {claim.multiMonthAllocation.total}
-                </div>
-                <div style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)", marginTop: 4 }}>
-                  Original transaction: {formatDate(claim.multiMonthAllocation.originalDate)} ·{" "}
-                  {claim.multiMonthAllocation.originalMerchant} ·{" "}
-                  {formatAmountINR(claim.multiMonthAllocation.originalAmount)}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* The MultiMonthSchedule block above already renders the allocation
+              context (original transaction + per-month breakdown). The former
+              plain note has been superseded. */}
 
           {/* Rejection reason block (when applicable) */}
           {claim.status === "rejected" && (claim.rejectionReason || claim.rejectionNote) && (
@@ -582,36 +608,34 @@ export function ClaimDetailsDrawer({
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  AllocationProgress — monthly cap usage bar                                */
+/*  MultiMonthSchedule                                                        */
+/*  Renders the original transaction summary + a per-month breakdown showing  */
+/*  how a lumpsum payment's slice consumes the employee's monthly category    */
+/*  cap in this month and the projected future months.                        */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-interface AllocationProgressProps {
+interface MonthEntry {
+  index: number;
+  label: string;
+  isCurrent: boolean;
+  isPast: boolean;
+  slice: number;
+  otherThisMonth: number;
   cap: number;
-  previouslyUsed: number;
-  current: number;
   remaining: number;
   overflow: number;
+}
+
+interface MultiMonthScheduleProps {
+  mm: NonNullable<Claim["multiMonthAllocation"]>;
+  months: MonthEntry[];
   categoryLabel: string;
 }
 
-function AllocationProgress({
-  cap,
-  previouslyUsed,
-  current,
-  remaining,
-  overflow,
-  categoryLabel,
-}: AllocationProgressProps) {
-  // Scale denominator: extend the bar beyond 100% when the claim pushes over the cap,
-  // so the overflow segment is still visible.
-  const scale = Math.max(cap, previouslyUsed + current);
-  const usedPct = (previouslyUsed / scale) * 100;
-  const currentPct = (current / scale) * 100;
-  const remainingPct = (remaining / scale) * 100;
-  const overflowPct = (overflow / scale) * 100;
-
+function MultiMonthSchedule({ mm, months, categoryLabel }: MultiMonthScheduleProps) {
   return (
     <div>
+      {/* Section title */}
       <div
         style={{
           fontSize: 10,
@@ -620,156 +644,218 @@ function AllocationProgress({
           textTransform: "uppercase",
           letterSpacing: "0.06em",
           marginBottom: "var(--space-2)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
         }}
       >
-        <span>Monthly Allocation</span>
-        <span style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--color-muted-foreground)", textTransform: "none", letterSpacing: 0 }}>
-          Cap ₹{cap.toLocaleString("en-IN")}
-        </span>
+        Multi-Month Allocation
       </div>
 
+      {/* Original transaction summary */}
       <div
         style={{
           backgroundColor: "var(--color-card)",
           border: "1px solid var(--color-border)",
           borderRadius: "var(--rounded-md)",
           padding: "var(--space-4)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-1)",
+          marginBottom: "var(--space-3)",
         }}
       >
-        {/* Bar */}
-        <div
-          style={{
-            height: 10,
-            backgroundColor: "var(--color-surface)",
-            borderRadius: "var(--rounded-full)",
-            overflow: "hidden",
-            display: "flex",
-            width: "100%",
-          }}
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={cap}
-          aria-valuenow={previouslyUsed + current}
-          aria-label={`${categoryLabel} monthly allocation`}
-        >
-          {previouslyUsed > 0 && (
-            <div
-              style={{
-                width: `${usedPct}%`,
-                backgroundColor: "var(--color-muted-foreground, #94a3b8)",
-                opacity: 0.45,
-              }}
-            />
-          )}
-          {current > 0 && (
-            <div
-              style={{
-                width: `${currentPct}%`,
-                backgroundColor: overflow > 0 ? "var(--brand-red)" : "var(--brand-accent)",
-              }}
-            />
-          )}
-          {remaining > 0 && (
-            <div
-              style={{
-                width: `${remainingPct}%`,
-                backgroundColor: "transparent",
-              }}
-            />
-          )}
-          {overflow > 0 && (
-            <div
-              style={{
-                width: `${overflowPct}%`,
-                background:
-                  "repeating-linear-gradient(45deg, var(--brand-red) 0 4px, var(--brand-red-light) 4px 8px)",
-              }}
-            />
-          )}
-        </div>
-
-        {/* Legend */}
         <div
           style={{
             display: "flex",
-            flexWrap: "wrap",
-            gap: "var(--space-4)",
-            marginTop: "var(--space-3)",
-            fontSize: "var(--text-xs)",
-            color: "var(--color-foreground)",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            gap: "var(--space-3)",
           }}
         >
-          <LegendItem
-            color="var(--color-muted-foreground, #94a3b8)"
-            opacity={0.45}
-            label="Previously claimed"
-            value={formatAmountINR(previouslyUsed)}
-          />
-          <LegendItem
-            color={overflow > 0 ? "var(--brand-red)" : "var(--brand-accent)"}
-            label="This claim"
-            value={formatAmountINR(current)}
-          />
-          <LegendItem
-            color="var(--color-border)"
-            label="Remaining"
-            value={formatAmountINR(remaining)}
-          />
-        </div>
-
-        {overflow > 0 && (
+          <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
+            {mm.originalMerchant}
+          </div>
           <div
             style={{
-              marginTop: "var(--space-3)",
-              padding: "var(--space-2) var(--space-3)",
-              backgroundColor: "var(--brand-red-light)",
-              color: "#7A1A12",
-              borderRadius: "var(--rounded-md)",
-              fontSize: "var(--text-xs)",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontWeight: 500,
+              fontSize: "var(--text-sm)",
+              fontWeight: 700,
+              color: "var(--color-foreground)",
+              fontVariantNumeric: "tabular-nums",
             }}
           >
-            <AlertTriangle size={14} style={{ flexShrink: 0 }} />
-            Exceeds monthly cap by {formatAmountINR(overflow)}
+            {formatAmountINR(mm.originalAmount)}
           </div>
-        )}
+        </div>
+        <div style={{ fontSize: "var(--text-xs)", color: "var(--color-muted-foreground)" }}>
+          Paid {formatDate(mm.originalDate)} · split across {mm.total} month{mm.total !== 1 ? "s" : ""} ·{" "}
+          {formatAmountINR(mm.allocationAmount)} / month
+        </div>
+      </div>
+
+      {/* Per-month breakdown — timeline of month cards */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+        {months.map((m) => (
+          <MonthRow key={m.index} month={m} categoryLabel={categoryLabel} />
+        ))}
       </div>
     </div>
   );
 }
 
-function LegendItem({
-  color,
-  opacity = 1,
-  label,
-  value,
-}: {
-  color: string;
-  opacity?: number;
-  label: string;
-  value: string;
-}) {
+function MonthRow({ month, categoryLabel }: { month: MonthEntry; categoryLabel: string }) {
+  const { label, isCurrent, isPast, slice, otherThisMonth, cap, remaining, overflow } = month;
+  const totalUsed = slice + otherThisMonth;
+  const scale = Math.max(cap, totalUsed);
+  const otherPct = (otherThisMonth / scale) * 100;
+  const slicePct = (slice / scale) * 100;
+  const overflowPct = (overflow / scale) * 100;
+
+  const statusLabel = isCurrent ? "Current Month" : isPast ? "Past Month" : "Projected";
+  const accentColor = overflow > 0 ? "var(--brand-red)" : "var(--brand-accent)";
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <span
+    <div
+      style={{
+        backgroundColor: "var(--color-card)",
+        border: `1px solid ${isCurrent ? "var(--brand-accent)" : "var(--color-border)"}`,
+        borderRadius: "var(--rounded-md)",
+        padding: "var(--space-4)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--space-3)",
+      }}
+      aria-current={isCurrent ? "step" : undefined}
+    >
+      {/* Top row — month label + status pill + amounts */}
+      <div
         style={{
-          display: "inline-block",
-          width: 8,
-          height: 8,
-          borderRadius: 2,
-          backgroundColor: color,
-          opacity,
-          flexShrink: 0,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "var(--space-3)",
+          flexWrap: "wrap",
         }}
-      />
-      <span style={{ color: "var(--color-muted-foreground)" }}>{label}</span>
-      <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{value}</span>
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <span
+            aria-hidden="true"
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "var(--rounded-full)",
+              backgroundColor: isCurrent ? accentColor : "var(--color-border)",
+              flexShrink: 0,
+            }}
+          />
+          <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--color-foreground)" }}>
+            {label}
+          </span>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: isCurrent ? "var(--brand-accent)" : "var(--color-muted-foreground)",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              backgroundColor: isCurrent ? "var(--brand-accent-alpha-12, rgba(79,70,229,0.12))" : "var(--color-surface)",
+              padding: "2px 8px",
+              borderRadius: "var(--rounded-full)",
+            }}
+          >
+            {statusLabel}
+          </span>
+        </div>
+        <div
+          style={{
+            fontSize: "var(--text-sm)",
+            color: "var(--color-foreground)",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>{formatAmountINR(slice)}</span>
+          <span style={{ color: "var(--color-muted-foreground)" }}>
+            {" "}of {formatAmountINR(cap)}
+          </span>
+        </div>
+      </div>
+
+      {/* Per-month bar */}
+      <div
+        style={{
+          height: 8,
+          backgroundColor: "var(--color-surface)",
+          borderRadius: "var(--rounded-full)",
+          overflow: "hidden",
+          display: "flex",
+          width: "100%",
+        }}
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={cap}
+        aria-valuenow={totalUsed}
+        aria-label={`${label} ${categoryLabel} cap usage`}
+      >
+        {otherThisMonth > 0 && (
+          <div
+            style={{
+              width: `${otherPct}%`,
+              backgroundColor: "var(--color-muted-foreground, #94a3b8)",
+              opacity: 0.45,
+            }}
+          />
+        )}
+        {slice > 0 && (
+          <div
+            style={{
+              width: `${slicePct}%`,
+              backgroundColor: accentColor,
+              opacity: isCurrent ? 1 : 0.55,
+            }}
+          />
+        )}
+        {overflow > 0 && (
+          <div
+            style={{
+              width: `${overflowPct}%`,
+              background:
+                "repeating-linear-gradient(45deg, var(--brand-red) 0 4px, var(--brand-red-light) 4px 8px)",
+            }}
+          />
+        )}
+      </div>
+
+      {/* Footnote row */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "var(--space-3)",
+          fontSize: "var(--text-xs)",
+          color: "var(--color-muted-foreground)",
+          flexWrap: "wrap",
+        }}
+      >
+        {isCurrent ? (
+          <>
+            <span>
+              {otherThisMonth > 0
+                ? `Other ${categoryLabel.toLowerCase()} claims this cycle: ${formatAmountINR(otherThisMonth)}`
+                : "No other claims this cycle in this category"}
+            </span>
+            <span style={{ color: overflow > 0 ? "var(--brand-red)" : "var(--color-muted-foreground)" }}>
+              {overflow > 0
+                ? `Over cap by ${formatAmountINR(overflow)}`
+                : `Remaining ${formatAmountINR(remaining)}`}
+            </span>
+          </>
+        ) : isPast ? (
+          <span>Slice already consumed the cap in this month.</span>
+        ) : (
+          <span>
+            Projected slice will use the full monthly cap — HR will see no headroom for other{" "}
+            {categoryLabel.toLowerCase()} claims in {label}.
+          </span>
+        )}
+      </div>
     </div>
   );
 }
