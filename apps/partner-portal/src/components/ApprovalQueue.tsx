@@ -516,7 +516,7 @@ export function ApprovalQueue() {
       {/* Filter controls — only for claim tabs, not disputes */}
       {activeTab !== "disputes" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-          {/* Row 1: category + filter toggle */}
+          {/* Row 1: category + filter toggle (side-by-side) */}
           <div
             style={{
               display: "flex",
@@ -529,7 +529,7 @@ export function ApprovalQueue() {
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value as AllowanceCategory | "all")}
               aria-label="Category filter"
-              style={inputStyle}
+              style={{ ...inputStyle, width: "auto", minWidth: 220 }}
             >
               <option value="all">All Categories</option>
               {FLEXI_BENEFIT_CATEGORIES.map((cat) => (
@@ -550,14 +550,33 @@ export function ApprovalQueue() {
                 fontSize: "var(--text-sm)",
                 fontWeight: 500,
                 border: "1px solid var(--color-border)",
-                backgroundColor: "var(--color-background)",
-                color: "var(--color-muted-foreground)",
+                backgroundColor: filtersVisible ? "var(--color-surface)" : "var(--color-background)",
+                color: "var(--color-foreground)",
                 borderRadius: "var(--rounded-md)",
                 cursor: "pointer",
               }}
             >
               <SlidersHorizontal size={14} />
-              {filtersVisible ? "Hide" : "Show"}
+              Filter
+              {filtersActive && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 18,
+                    height: 18,
+                    padding: "0 5px",
+                    borderRadius: "var(--rounded-full)",
+                    backgroundColor: "var(--brand-accent)",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                  }}
+                >
+                  •
+                </span>
+              )}
             </button>
             {filtersActive && (
               <button
@@ -780,6 +799,7 @@ export function ApprovalQueue() {
       {/* Claim Details Drawer */}
       <ClaimDetailsDrawer
         claim={liveDetailClaim}
+        allClaims={claims}
         open={!!liveDetailClaim}
         readOnly={readOnly}
         onClose={handleCloseDetails}

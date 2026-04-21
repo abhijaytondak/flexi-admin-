@@ -1,14 +1,36 @@
 "use client";
 
-import { useEffect, type CSSProperties } from "react";
-import { X, CheckCircle2, XCircle, FileText, Image as ImageIcon, BadgeCheck } from "lucide-react";
-import type { Claim } from "@partner-portal/shared";
+import { useEffect, useMemo, type CSSProperties } from "react";
+import { X, CheckCircle2, XCircle, FileText, Image as ImageIcon, BadgeCheck, AlertTriangle } from "lucide-react";
+import type { Claim, AllowanceCategory } from "@partner-portal/shared";
 import { parseINR } from "@partner-portal/shared";
 import { font, formatAmountINR, formatDate, CATEGORY_LABEL } from "./constants";
 import { StatusPill, RiskBadge, AutoApproveTag, BillStatusBadge } from "./ClaimBadges";
 
+/**
+ * Per-category monthly allocation caps (demo values).
+ * In production these come from the Policy Engine config per company / slab.
+ */
+const MONTHLY_CATEGORY_CAP_INR: Record<AllowanceCategory, number> = {
+  food: 2200,
+  children_education: 1500,
+  hostel: 2500,
+  books_periodicals: 1500,
+  professional_development: 5000,
+  phone_internet: 2000,
+  health_fitness: 4000,
+  uniform: 1500,
+  gift: 5000,
+  business_travel: 10000,
+  fuel: 3000,
+  vehicle_maintenance: 3000,
+  drivers_salary: 10000,
+  other: 2000,
+};
+
 interface ClaimDetailsDrawerProps {
   claim: Claim | null;
+  allClaims: Claim[];
   open: boolean;
   readOnly?: boolean;
   onClose: () => void;
@@ -126,6 +148,7 @@ function MetaField({ label, value }: { label: string; value: React.ReactNode }) 
 
 export function ClaimDetailsDrawer({
   claim,
+  allClaims,
   open,
   readOnly = false,
   onClose,
@@ -139,6 +162,38 @@ export function ClaimDetailsDrawer({
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
+
+  // Monthly allocation usage for this employee + category in the claim's cycle.
+  const allocation = useMemo(() => {
+    if (!claim) return null;
+    const cap = MONTHLY_CATEGORY_CAP_INR[claim.category as AllowanceCategory];
+    if (!cap) return null;
+    const cycleId = claim.cycleId;
+    const counted: Claim["status"][] = [
+      "approved",
+      "auto_approved",
+      "pending",
+      "submitted",
+      "claimed",
+      "invoice_pending",
+      "flagged_for_later",
+      "eligible",
+    ];
+    const previouslyUsed = allClaims
+      .filter(
+        (c) =>
+          c.id !== claim.id &&
+          c.employeeId === claim.employeeId &&
+          c.category === claim.category &&
+          (!cycleId || c.cycleId === cycleId) &&
+          counted.includes(c.status),
+      )
+      .reduce((sum, c) => sum + parseINR(c.claimAmount), 0);
+    const current = parseINR(claim.claimAmount);
+    const remaining = Math.max(cap - previouslyUsed - current, 0);
+    const overflow = Math.max(previouslyUsed + current - cap, 0);
+    return { cap, previouslyUsed, current, remaining, overflow };
+  }, [claim, allClaims]);
 
   if (!open || !claim) return null;
 
@@ -243,6 +298,18 @@ export function ClaimDetailsDrawer({
             <MetaField label="Transaction ID" value={claim.transactionId || "—"} />
             <MetaField label="Employee ID" value={claim.employeeId || "—"} />
           </div>
+
+          {/* Monthly allocation progress */}
+          {allocation && (
+            <AllocationProgress
+              cap={allocation.cap}
+              previouslyUsed={allocation.previouslyUsed}
+              current={allocation.current}
+              remaining={allocation.remaining}
+              overflow={allocation.overflow}
+              categoryLabel={categoryLabel}
+            />
+          )}
 
           {/* Optional row: risk + bill + auto-approve rule */}
           {(claim.riskLevel || claim.billStatus || claim.autoApproveRule) && (
@@ -470,5 +537,198 @@ export function ClaimDetailsDrawer({
         )}
       </aside>
     </>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  AllocationProgress — monthly cap usage bar                                */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+interface AllocationProgressProps {
+  cap: number;
+  previouslyUsed: number;
+  current: number;
+  remaining: number;
+  overflow: number;
+  categoryLabel: string;
+}
+
+function AllocationProgress({
+  cap,
+  previouslyUsed,
+  current,
+  remaining,
+  overflow,
+  categoryLabel,
+}: AllocationProgressProps) {
+  // Scale denominator: extend the bar beyond 100% when the claim pushes over the cap,
+  // so the overflow segment is still visible.
+  const scale = Math.max(cap, previouslyUsed + current);
+  const usedPct = (previouslyUsed / scale) * 100;
+  const currentPct = (current / scale) * 100;
+  const remainingPct = (remaining / scale) * 100;
+  const overflowPct = (overflow / scale) * 100;
+
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          color: "var(--color-muted-foreground)",
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          marginBottom: "var(--space-2)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+        }}
+      >
+        <span>Monthly Allocation</span>
+        <span style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--color-muted-foreground)", textTransform: "none", letterSpacing: 0 }}>
+          Cap ₹{cap.toLocaleString("en-IN")}
+        </span>
+      </div>
+
+      <div
+        style={{
+          backgroundColor: "var(--color-card)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--rounded-md)",
+          padding: "var(--space-4)",
+        }}
+      >
+        {/* Bar */}
+        <div
+          style={{
+            height: 10,
+            backgroundColor: "var(--color-surface)",
+            borderRadius: "var(--rounded-full)",
+            overflow: "hidden",
+            display: "flex",
+            width: "100%",
+          }}
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={cap}
+          aria-valuenow={previouslyUsed + current}
+          aria-label={`${categoryLabel} monthly allocation`}
+        >
+          {previouslyUsed > 0 && (
+            <div
+              style={{
+                width: `${usedPct}%`,
+                backgroundColor: "var(--color-muted-foreground, #94a3b8)",
+                opacity: 0.45,
+              }}
+            />
+          )}
+          {current > 0 && (
+            <div
+              style={{
+                width: `${currentPct}%`,
+                backgroundColor: overflow > 0 ? "var(--brand-red)" : "var(--brand-accent)",
+              }}
+            />
+          )}
+          {remaining > 0 && (
+            <div
+              style={{
+                width: `${remainingPct}%`,
+                backgroundColor: "transparent",
+              }}
+            />
+          )}
+          {overflow > 0 && (
+            <div
+              style={{
+                width: `${overflowPct}%`,
+                background:
+                  "repeating-linear-gradient(45deg, var(--brand-red) 0 4px, var(--brand-red-light) 4px 8px)",
+              }}
+            />
+          )}
+        </div>
+
+        {/* Legend */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "var(--space-4)",
+            marginTop: "var(--space-3)",
+            fontSize: "var(--text-xs)",
+            color: "var(--color-foreground)",
+          }}
+        >
+          <LegendItem
+            color="var(--color-muted-foreground, #94a3b8)"
+            opacity={0.45}
+            label="Previously claimed"
+            value={formatAmountINR(previouslyUsed)}
+          />
+          <LegendItem
+            color={overflow > 0 ? "var(--brand-red)" : "var(--brand-accent)"}
+            label="This claim"
+            value={formatAmountINR(current)}
+          />
+          <LegendItem
+            color="var(--color-border)"
+            label="Remaining"
+            value={formatAmountINR(remaining)}
+          />
+        </div>
+
+        {overflow > 0 && (
+          <div
+            style={{
+              marginTop: "var(--space-3)",
+              padding: "var(--space-2) var(--space-3)",
+              backgroundColor: "var(--brand-red-light)",
+              color: "#7A1A12",
+              borderRadius: "var(--rounded-md)",
+              fontSize: "var(--text-xs)",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontWeight: 500,
+            }}
+          >
+            <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+            Exceeds monthly cap by {formatAmountINR(overflow)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LegendItem({
+  color,
+  opacity = 1,
+  label,
+  value,
+}: {
+  color: string;
+  opacity?: number;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span
+        style={{
+          display: "inline-block",
+          width: 8,
+          height: 8,
+          borderRadius: 2,
+          backgroundColor: color,
+          opacity,
+          flexShrink: 0,
+        }}
+      />
+      <span style={{ color: "var(--color-muted-foreground)" }}>{label}</span>
+      <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{value}</span>
+    </div>
   );
 }
