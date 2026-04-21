@@ -14,6 +14,46 @@ import { DEMO_EMPLOYEES, DEMO_CLAIMS } from "@partner-portal/shared/demo-data";
 
 const font: CSSProperties = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
+/**
+ * Flexi annual limit ≈ 12% of CTC (industry-typical). In production this
+ * comes from the Policy Engine per-employee config; computed here for the
+ * demo so the Directory can surface Monthly + Annual limits at a glance.
+ */
+function parseSalaryInt(s: string | undefined): number {
+  if (!s) return 0;
+  const n = Number(String(s).replace(/[^\d]/g, ""));
+  return isNaN(n) ? 0 : n;
+}
+function getAnnualLimitINR(emp: Employee): number {
+  return Math.round(parseSalaryInt(emp.salary) * 0.12);
+}
+function getMonthlyLimitINR(emp: Employee): number {
+  // Pro-rate across remaining fiscal months from DOJ; fall back to /12 when
+  // DOJ unknown. Indian FY runs Apr → Mar.
+  const annual = getAnnualLimitINR(emp);
+  if (!annual) return 0;
+  const doj = emp.dateOfJoining ? new Date(emp.dateOfJoining) : null;
+  if (!doj || isNaN(doj.getTime())) return Math.round(annual / 12);
+  const today = new Date();
+  const fyStart = new Date(
+    today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1,
+    3,
+    1,
+  );
+  const effective = doj > fyStart ? doj : fyStart;
+  // Months remaining to March 31 of the next calendar year after fyStart.
+  const fyEnd = new Date(fyStart.getFullYear() + 1, 2, 31);
+  const monthsRemaining =
+    (fyEnd.getFullYear() - effective.getFullYear()) * 12 +
+    (fyEnd.getMonth() - effective.getMonth()) +
+    1;
+  return Math.round(annual / Math.max(monthsRemaining, 1));
+}
+function formatLimitINR(n: number): string {
+  if (!n || n <= 0) return "—";
+  return `₹${n.toLocaleString("en-IN")}`;
+}
+
 const btnPrimary: CSSProperties = {
   ...font, display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
   padding: "var(--space-2) var(--space-4)", backgroundColor: "var(--brand-accent)",
@@ -898,7 +938,7 @@ export function EmployeeDirectory() {
             borderRadius: "var(--rounded-lg)", overflow: "hidden",
           }}>
             <div style={{
-              display: "grid", gridTemplateColumns: "2fr 1fr 1.2fr 1.2fr 0.6fr 0.8fr",
+              display: "grid", gridTemplateColumns: "1.8fr 0.9fr 1.1fr 1fr 1fr 1fr 0.7fr 0.8fr",
               gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
               borderBottom: "1px solid var(--color-border)", backgroundColor: "var(--color-background)",
               fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--color-muted-foreground)",
@@ -908,6 +948,8 @@ export function EmployeeDirectory() {
               <span>Employee ID</span>
               <span>Phone Number</span>
               <span>Policy Band</span>
+              <span style={{ textAlign: "right" }}>Monthly Limit</span>
+              <span style={{ textAlign: "right" }}>Annual Limit</span>
               <span>Status</span>
               <span>Tax Slab</span>
             </div>
@@ -917,11 +959,14 @@ export function EmployeeDirectory() {
                 No employees match your filters.
               </p>
             ) : (
-              filtered.map((emp, idx) => (
+              filtered.map((emp, idx) => {
+                const monthly = getMonthlyLimitINR(emp);
+                const annual = getAnnualLimitINR(emp);
+                return (
                 <div key={emp.id || idx}
                   onClick={() => openProfile(emp)}
                   style={{
-                    display: "grid", gridTemplateColumns: "2fr 1fr 1.2fr 1.2fr 0.6fr 0.8fr",
+                    display: "grid", gridTemplateColumns: "1.8fr 0.9fr 1.1fr 1fr 1fr 1fr 0.7fr 0.8fr",
                     gap: "var(--space-3)", padding: "var(--space-3) var(--space-4)",
                     borderBottom: idx < filtered.length - 1 ? "1px solid var(--color-border)" : "none",
                     cursor: "pointer", transition: "background-color 150ms",
@@ -929,7 +974,7 @@ export function EmployeeDirectory() {
                   onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--color-background)"}
                   onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", minWidth: 0 }}>
                     <div style={{
                       width: 36, height: 36, borderRadius: "var(--rounded-full)",
                       backgroundColor: emp.color || "var(--brand-navy)",
@@ -938,18 +983,46 @@ export function EmployeeDirectory() {
                     }}>
                       {emp.initials || emp.name?.slice(0, 2).toUpperCase()}
                     </div>
-                    <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)" }}>
+                    <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--color-foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {emp.name}
                     </span>
                   </div>
                   <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center" }}>
                     {emp.id || "—"}
                   </span>
-                  <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center" }}>
+                  <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {emp.phone || "—"}
                   </span>
-                  <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center" }}>
+                  <span style={{ fontSize: "var(--text-sm)", color: "var(--color-muted-foreground)", display: "flex", alignItems: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {emp.benefitPlan || "—"}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "var(--text-sm)",
+                      color: "var(--color-foreground)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      fontVariantNumeric: "tabular-nums",
+                      fontWeight: 500,
+                    }}
+                    title={monthly > 0 ? `${formatLimitINR(monthly)} — DOJ-prorated share of annual flexi cap` : "Salary unknown"}
+                  >
+                    {formatLimitINR(monthly)}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "var(--text-sm)",
+                      color: "var(--color-foreground)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      fontVariantNumeric: "tabular-nums",
+                      fontWeight: 500,
+                    }}
+                    title={annual > 0 ? "Estimated annual flexi cap (~12% of CTC)" : "Salary unknown"}
+                  >
+                    {formatLimitINR(annual)}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
                     <div style={statusDot(emp.status)} />
@@ -967,7 +1040,8 @@ export function EmployeeDirectory() {
                     }}>{emp.taxRegime === "old" ? "Old" : "New"}</span>
                   </span>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </>
