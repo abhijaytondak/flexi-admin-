@@ -3,7 +3,7 @@
 import { useEffect, useMemo, type CSSProperties } from "react";
 import { X, CheckCircle2, XCircle, FileText, Image as ImageIcon, BadgeCheck, AlertTriangle } from "lucide-react";
 import type { Claim, AllowanceCategory } from "@partner-portal/shared";
-import { parseINR } from "@partner-portal/shared";
+import { parseINR, FLEXI_BENEFIT_CATEGORIES } from "@partner-portal/shared";
 import { font, formatAmountINR, formatDate, CATEGORY_LABEL } from "./constants";
 import { StatusPill, RiskBadge, AutoApproveTag, BillStatusBadge } from "./ClaimBadges";
 
@@ -27,6 +27,45 @@ const MONTHLY_CATEGORY_CAP_INR: Record<AllowanceCategory, number> = {
   drivers_salary: 10000,
   other: 2000,
 };
+
+/**
+ * Demo claims store `category` / `benefitType` as freeform labels (e.g.
+ * "Fuel", "Health and Fitness Allowance") rather than AllowanceCategory keys.
+ * This normalizes them so policy-driven lookups (caps, labels) work.
+ */
+function resolveCategoryKey(claim: Claim): AllowanceCategory | null {
+  const candidates = [claim.benefitType, claim.category]
+    .filter(Boolean)
+    .map((s) => String(s).toLowerCase());
+
+  // Exact label match (e.g. "Fuel Allowance" → fuel)
+  for (const cat of FLEXI_BENEFIT_CATEGORIES) {
+    if (candidates.includes(cat.label.toLowerCase())) return cat.key;
+  }
+
+  // Substring match for loose labels like "Health" or "Travel"
+  const aliases: Array<[RegExp, AllowanceCategory]> = [
+    [/fuel/, "fuel"],
+    [/health|fitness/, "health_fitness"],
+    [/phone|internet/, "phone_internet"],
+    [/food/, "food"],
+    [/gift|voucher/, "gift"],
+    [/uniform/, "uniform"],
+    [/hostel/, "hostel"],
+    [/children.*education|education.*children/, "children_education"],
+    [/books|periodicals/, "books_periodicals"],
+    [/professional|development/, "professional_development"],
+    [/travel|business/, "business_travel"],
+    [/vehicle|maintenance/, "vehicle_maintenance"],
+    [/driver/, "drivers_salary"],
+  ];
+  for (const text of candidates) {
+    for (const [pattern, key] of aliases) {
+      if (pattern.test(text)) return key;
+    }
+  }
+  return null;
+}
 
 interface ClaimDetailsDrawerProps {
   claim: Claim | null;
@@ -166,7 +205,9 @@ export function ClaimDetailsDrawer({
   // Monthly allocation usage for this employee + category in the claim's cycle.
   const allocation = useMemo(() => {
     if (!claim) return null;
-    const cap = MONTHLY_CATEGORY_CAP_INR[claim.category as AllowanceCategory];
+    const categoryKey = resolveCategoryKey(claim);
+    if (!categoryKey) return null;
+    const cap = MONTHLY_CATEGORY_CAP_INR[categoryKey];
     if (!cap) return null;
     const cycleId = claim.cycleId;
     const counted: Claim["status"][] = [
@@ -184,7 +225,7 @@ export function ClaimDetailsDrawer({
         (c) =>
           c.id !== claim.id &&
           c.employeeId === claim.employeeId &&
-          c.category === claim.category &&
+          resolveCategoryKey(c) === categoryKey &&
           (!cycleId || c.cycleId === cycleId) &&
           counted.includes(c.status),
       )
